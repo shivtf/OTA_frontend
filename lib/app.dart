@@ -12,7 +12,7 @@ class WanderlyApp extends StatelessWidget {
     return Consumer<ThemeController>(
       builder: (context, themeController, child) {
         return MaterialApp(
-          title: 'Wanderly',
+          title: 'Wanderly App',
           debugShowCheckedModeBanner: false,
           themeMode: themeController.themeMode,
           theme: AppTheme.lightTheme,
