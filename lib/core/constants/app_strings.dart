@@ -5,12 +5,12 @@ class AppStrings {
   AppStrings._();
 
   //App Info
-  static const String appName = 'Wanderly';
+  static const String appName = 'Wanderly App';
   static const String appTagline = 'Explore. Dream. Discover.';
   static const String appSubtitle = 'All in one beatuiful travel experience.';
   static const String appFeatures = 'Flights, Hotels & Cars';
   static const String trustedBy = 'Trusted by travelers worldwide';
-  static const String languageDelector = '🌐  English (US)';
+  static const String languageSelector = '🌐  English (US)';
 
   //Splash
   static const String getStarted = 'Get Started';
@@ -34,7 +34,7 @@ class AppStrings {
   static const String confirmedPassword = 'Confirm Password';
   static const String phoneNumber = 'Phone Number';
   static const String agreeTerms = 'I agree to the';
-  static const String termsCondition = 'Terms & Condition';
+  static const String termsConditions = 'Terms & Condition';
   static const String orSignUpWith = 'Or sign up with';
   static const String alreadyAccount = 'Already have an account?';
   static const String loginLink = 'Login';
@@ -46,7 +46,7 @@ class AppStrings {
   //Validation
   static const String fieldRequired = 'This field is required';
   static const String invalidEmail = 'Please enter a valid name';
-  static const String passwordToShort = 'Password must be at least 8 characters';
+  static const String passwordTooShort = 'Password must be at least 8 characters';
   static const String invalidPhone = 'Please enter a valid phone number';
   static const String passwordsNoMatch = 'Password do not match';
   static const String agreeTermsError = 'Please agree to term and conditions';

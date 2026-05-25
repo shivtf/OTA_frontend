@@ -34,7 +34,7 @@ class AppRoutes {
     }
   }
 
-  static PageRouteBuilder -buildRoute(Widget page, RouteSettings settings){
+  static PageRouteBuilder _buildRoute(Widget page, RouteSettings settings){
     return PageRouteBuilder(
       settings: settings,
       pageBuilder:(_,__,___) => page,
@@ -43,8 +43,8 @@ class AppRoutes {
           (opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
           child:child,
         );
-      }
-      trans
-    )
+      },
+        transitionDuration: const Duration(milliseconds: 300),
+    );
   }
 }
