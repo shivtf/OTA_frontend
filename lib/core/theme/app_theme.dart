@@ -1,8 +1,7 @@
-
+// lib/core/theme/app_theme.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import '../constants/app_colors.dart';
 import '../constants/app_sizes.dart';
 
@@ -53,10 +52,7 @@ class AppTheme {
           return Colors.transparent;
         }),
         checkColor: WidgetStateProperty.all(Colors.white),
-        side: const BorderSide(
-          color: AppColors.primaryStart,
-          width: 1.5,
-        ),
+        side: const BorderSide(color: AppColors.primaryStart, width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
         ),
@@ -91,10 +87,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
-          side: const BorderSide(
-            color: AppColors.darkBorder,
-            width: 1,
-          ),
+          side: const BorderSide(color: AppColors.darkBorder, width: 1),
         ),
       ),
       appBarTheme: const AppBarTheme(
@@ -111,10 +104,7 @@ class AppTheme {
           return Colors.transparent;
         }),
         checkColor: WidgetStateProperty.all(Colors.white),
-        side: const BorderSide(
-          color: AppColors.primaryEnd,
-          width: 1.5,
-        ),
+        side: const BorderSide(color: AppColors.primaryEnd, width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
         ),
@@ -192,10 +182,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-        borderSide: const BorderSide(
-          color: AppColors.primaryStart,
-          width: 2,
-        ),
+        borderSide: const BorderSide(color: AppColors.primaryStart, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
@@ -203,10 +190,7 @@ class AppTheme {
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-        borderSide: const BorderSide(
-          color: AppColors.error,
-          width: 2,
-        ),
+        borderSide: const BorderSide(color: AppColors.error, width: 2),
       ),
       hintStyle: GoogleFonts.nunito(
         color: hintColor,
@@ -220,10 +204,7 @@ class AppTheme {
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryStart,
         foregroundColor: Colors.white,
-        minimumSize: const Size(
-          double.infinity,
-          AppSizes.buttonHeight,
-        ),
+        minimumSize: const Size(double.infinity, AppSizes.buttonHeight),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
         ),

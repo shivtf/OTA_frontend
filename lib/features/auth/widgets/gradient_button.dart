@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
-
 class GradientButton extends StatefulWidget {
   final String text;
   final VoidCallback? onPressed;
@@ -74,7 +73,7 @@ class _GradientButtonState extends State<GradientButton>
             boxShadow: widget.onPressed != null
                 ? [
               BoxShadow(
-                color: AppColors.primaryStart.withValues(alpha: 0.45),
+                color: AppColors.primaryStart.withValues(alpha:0.45),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
                 spreadRadius: -4,

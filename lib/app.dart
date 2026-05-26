@@ -1,3 +1,4 @@
+// lib/app.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/routes/app_routes.dart';
@@ -12,7 +13,7 @@ class WanderlyApp extends StatelessWidget {
     return Consumer<ThemeController>(
       builder: (context, themeController, child) {
         return MaterialApp(
-          title: 'Wanderly App',
+          title: 'Wanderly',
           debugShowCheckedModeBanner: false,
           themeMode: themeController.themeMode,
           theme: AppTheme.lightTheme,

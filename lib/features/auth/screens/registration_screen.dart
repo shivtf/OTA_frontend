@@ -9,9 +9,9 @@ import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/custom_back_button.dart';
-import '../../widgets/auth_header.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/gradient_button.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/custom_text_field.dart';
+import '../widgets/gradient_button.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -264,7 +264,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 // Confirm Password
                 CustomTextField(
                   label: 'Confirm Password *',
-                  hint: AppStrings.confirmedPassword,
+                  hint: AppStrings.confirmPassword,
                   prefixIcon: Icons.lock_reset_outlined,
                   isPassword: true,
                   controller: _confirmPasswordController,

@@ -8,12 +8,12 @@ import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/custom_back_button.dart';
-import '../../widgets/app_logo.dart';
-import '../../widgets/auth_divider.dart';
-import '../../widgets/auth_header.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/gradient_button.dart';
-import '../../widgets/social_login_button.dart';
+import '../widgets/app_logo.dart';
+import '../widgets/auth_divider.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/custom_text_field.dart';
+import '../widgets/gradient_button.dart';
+import '../widgets/social_login_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,8 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(seconds: 1));
     if (mounted) setState(() => _isLoading = false);
 
-    // Navigate to home (phase 2)
-    // Navigator.of(context).pushNamed(AppRoutes.home);
+    if (mounted) Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.home, (_) => false);
   }
 
   @override

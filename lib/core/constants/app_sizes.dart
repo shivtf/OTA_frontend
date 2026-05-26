@@ -1,42 +1,41 @@
-
-
+// lib/core/constants/app_sizes.dart
 
 class AppSizes {
   AppSizes._();
 
-  //Border Radius
+  // Border Radius
   static const double radiusSmall = 8.0;
   static const double radiusMedium = 16.0;
   static const double radiusLarge = 24.0;
   static const double radiusXL = 32.0;
-  static const double radiusCircle = 100;
+  static const double radiusCircle = 100.0;
 
-  //Padding / Spacing
+  // Padding / Spacing
   static const double paddingXS = 4.0;
   static const double paddingSM = 8.0;
   static const double paddingMD = 16.0;
   static const double paddingLG = 24.0;
   static const double paddingXL = 32.0;
-  static const double paddingXXL = 40.0;
+  static const double paddingXXL = 48.0;
 
-  //Icon Sizes
+  // Icon Sizes
   static const double iconSM = 18.0;
   static const double iconMD = 24.0;
   static const double iconLG = 32.0;
-  static const double iconXL = 40.0;
+  static const double iconXL = 48.0;
 
-  //Button
+  // Button
   static const double buttonHeight = 56.0;
   static const double buttonHeightSM = 48.0;
 
-  //Input Field
+  // Input Field
   static const double inputHeight = 56.0;
 
-  //Logo
+  // Logo
   static const double logoSize = 56.0;
   static const double logoSizeLG = 72.0;
 
-  //Font Sizes
+  // Font Sizes
   static const double fontXS = 11.0;
   static const double fontSM = 13.0;
   static const double fontMD = 15.0;

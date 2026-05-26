@@ -9,11 +9,11 @@ import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/custom_back_button.dart';
-import '../../widgets/auth_divider.dart';
-import '../../widgets/auth_header.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/gradient_button.dart';
-import '../../widgets/social_login_button.dart';
+import '../widgets/auth_divider.dart';
+import '../widgets/auth_header.dart';
+import '../widgets/custom_text_field.dart';
+import '../widgets/gradient_button.dart';
+import '../widgets/social_login_button.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -90,7 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const CustomBackButton(),
+                    CustomBackButton(),
                     _ThemeToggleSmall(
                         controller: themeController, isDark: isDark),
                   ],
@@ -185,7 +185,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 // Confirm Password
                 CustomTextField(
                   label: 'Confirm Password',
-                  hint: AppStrings.confirmedPassword,
+                  hint: AppStrings.confirmPassword,
                   prefixIcon: Icons.lock_reset_outlined,
                   isPassword: true,
                   controller: _confirmPasswordController,
