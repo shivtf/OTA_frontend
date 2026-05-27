@@ -38,7 +38,6 @@ class AppColors {
 
   // Social
   static const Color googleBg = Color(0xFFFFFFFF);
-  static const Color appleBg = Color(0xFF000000);
 
   // Gradient definitions
   static const LinearGradient primaryGradient = LinearGradient(
@@ -63,7 +62,7 @@ class AppColors {
   static LinearGradient get darkOverlay => LinearGradient(
     colors: [
       Colors.transparent,
-      Colors.black.withOpacity(0.7),
+      Colors.black.withValues(alpha:0.7),
     ],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,

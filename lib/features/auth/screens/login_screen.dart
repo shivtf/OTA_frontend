@@ -157,12 +157,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Social buttons
                 SocialLoginButton(
-                  type: SocialType.google,
-                  onPressed: () {},
-                ),
-                const SizedBox(height: AppSizes.paddingMD),
-                SocialLoginButton(
-                  type: SocialType.apple,
                   onPressed: () {},
                 ),
 

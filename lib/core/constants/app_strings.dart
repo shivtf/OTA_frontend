@@ -55,5 +55,4 @@ class AppStrings {
 
   // Social
   static const String continueWithGoogle = 'Continue with Google';
-  static const String continueWithApple = 'Continue with Apple';
 }

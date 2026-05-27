@@ -12,8 +12,8 @@ class QuickCategoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final categories = [
       {'icon': Icons.flight_rounded, 'label': 'Flights', 'route': AppRoutes.flightSearch},
-      {'icon': Icons.hotel_rounded, 'label': 'Hotels', 'route': null},
-      {'icon': Icons.directions_car_rounded, 'label': 'Cars', 'route': null},
+      {'icon': Icons.hotel_rounded, 'label': 'Hotels', 'route': AppRoutes.hotelSearch},
+      {'icon': Icons.directions_car_rounded, 'label': 'Cars', 'route': AppRoutes.carSearch},
       {'icon': Icons.card_giftcard_rounded, 'label': 'Packages', 'route': null},
     ];
 
@@ -74,7 +74,7 @@ class _CategoryItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primaryStart.withValues(alpha:0.35),
+                  color: AppColors.primaryStart.withOpacity(0.35),
                   blurRadius: 14,
                   offset: const Offset(0, 6),
                   spreadRadius: -2,

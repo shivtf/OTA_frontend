@@ -8,18 +8,30 @@ import '../../features/home/screens/home_screen.dart';
 import '../../features/flights/screens/flight_search_screen.dart';
 import '../../features/flights/screens/flight_results_screen.dart';
 import '../../features/flights/screens/flight_details_screen.dart';
+import '../../features/hotels/screens/hotel_search_screen.dart';
+import '../../features/hotels/screens/hotel_results_screen.dart';
+import '../../features/hotels/screens/hotel_details_screen.dart';
+import '../../features/cars/screens/car_search_screen.dart';
+import '../../features/cars/screens/car_results_screen.dart';
+import '../../features/cars/screens/car_details_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
 
-  static const String splash       = '/';
-  static const String login        = '/login';
-  static const String signup       = '/signup';
-  static const String registration = '/registration';
-  static const String home         = '/home';
+  static const String splash        = '/';
+  static const String login         = '/login';
+  static const String signup        = '/signup';
+  static const String registration  = '/registration';
+  static const String home          = '/home';
   static const String flightSearch  = '/flights/search';
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details';
+  static const String hotelSearch   = '/hotels/search';
+  static const String hotelResults  = '/hotels/results';
+  static const String hotelDetails  = '/hotels/details';
+  static const String carSearch     = '/cars/search';
+  static const String carResults    = '/cars/results';
+  static const String carDetails    = '/cars/details';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -27,10 +39,16 @@ class AppRoutes {
       case login:         return _fade(const LoginScreen(), settings);
       case signup:        return _fade(const SignupScreen(), settings);
       case registration:  return _fade(const RegistrationScreen(), settings);
-      //case home:          return _fade(const HomeSearchBar(), settings);
+      case home:          return _fade(const HomeScreen(), settings);
       case flightSearch:  return _slide(const FlightSearchScreen(), settings);
       case flightResults: return _slide(const FlightResultsScreen(), settings);
       case flightDetails: return _slide(const FlightDetailsScreen(), settings);
+      case hotelSearch:   return _slide(const HotelSearchScreen(), settings);
+      case hotelResults:  return _slide(const HotelResultsScreen(), settings);
+      case hotelDetails:  return _slide(const HotelDetailsScreen(), settings);
+      case carSearch:     return _slide(const CarSearchScreen(), settings);
+      case carResults:    return _slide(const CarResultsScreen(), settings);
+      case carDetails:    return _slide(const CarDetailsScreen(), settings);
       default:            return _fade(const SplashScreen(), settings);
     }
   }

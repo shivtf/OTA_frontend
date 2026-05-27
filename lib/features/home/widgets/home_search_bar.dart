@@ -1,99 +1,62 @@
+// lib/features/home/widgets/home_search_bar.dart
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/routes/app_routes.dart';
 
-class HomeBottomNav extends StatefulWidget {
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-
-  const HomeBottomNav ({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-  });
+class HomeSearchBar extends StatelessWidget {
+  final bool isDark;
+  const HomeSearchBar({super.key, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightCard,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:(isDark ? 0.3 : 0.08)),
-            blurRadius: 20,
-            offset: const Offset(0,-4),
-          ),
-        ],
-        border:isDark
-            ? const Border(top:BorderSide(color:AppColors.darkBorder, width:1))
-            : null,
-      ),
-      child:SafeArea(
-        child:SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _NavItem(icon: Icons.home_rounded, label: 'Home', index: 0, currentIndex: currentIndex, onTap: onTap),
-              _NavItem(icon: Icons.hotel_rounded, label: 'Hotels', index: 1, currentIndex: currentIndex, onTap: onTap),
-              _NavItem(icon: Icons.directions_car_rounded, label: 'Cars', index: 2, currentIndex: currentIndex, onTap: onTap),
-              _NavItem(icon: Icons.person_rounded, label: 'Profile', index: 3, currentIndex: currentIndex, onTap: onTap),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final int index;
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.index,
-    required this.currentIndex,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isSelected = index == currentIndex;
-    final color = isSelected
-        ? (isDark ? AppColors.primaryLight : AppColors.primary)
-        : (isDark ? AppColors.darkSubtext : AppColors.lightSubtext);
-
     return GestureDetector(
-      onTap: () => onTap(index),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      onTap: () => Navigator.of(context).pushNamed(AppRoutes.flightSearch),
+      child: Container(
+        height: 56,
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha:isDark ? 0.15 : 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+          boxShadow: isDark
+              ? null
+              : [
+            BoxShadow(
+              color: AppColors.primaryStart.withOpacity(0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 3),
+            const SizedBox(width: 16),
+            Icon(
+              Icons.search_rounded,
+              color: AppColors.primaryStart,
+              size: 22,
+            ),
+            const SizedBox(width: 10),
             Text(
-              label,
+              'Search flights, hotels, cars...',
               style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 14,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
               ),
+            ),
+            const Spacer(),
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.tune_rounded,
+                  color: Colors.white, size: 16),
             ),
           ],
         ),

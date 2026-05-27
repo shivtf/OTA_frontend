@@ -90,7 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    CustomBackButton(),
+                    const CustomBackButton(),
                     _ThemeToggleSmall(
                         controller: themeController, isDark: isDark),
                   ],
@@ -226,12 +226,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 // Social buttons
                 SocialLoginButton(
-                  type: SocialType.google,
-                  onPressed: () {},
-                ),
-                const SizedBox(height: AppSizes.paddingMD),
-                SocialLoginButton(
-                  type: SocialType.apple,
                   onPressed: () {},
                 ),
 
