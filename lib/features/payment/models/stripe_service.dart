@@ -1,62 +1,68 @@
 // lib/features/payment/models/stripe_service.dart
-import 'dart:convert';
+//
+// Connected to the real backend at https://ota-jnuy.onrender.com/api/v1/payments
+// Flow:
+//   1. POST /payments/initiate  → get clientSecret
+//   2. Init Stripe payment sheet
+//   3. Present sheet → user pays
+//   4. POST /payments/confirm   → backend confirms & triggers booking
+
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:http/http.dart' as http;
+import '../../../core/network/api_client.dart';
 
 class StripeService {
   StripeService._();
   static final StripeService instance = StripeService._();
 
-  // ── Stripe publishable key (test mode) ─────────────────────────────────────
-  // Replace with your own key from https://dashboard.stripe.com/test/apikeys
+  // ── YOUR Stripe publishable key ────────────────────────────────────────────
+  // Get from https://dashboard.stripe.com/test/apikeys
+  // Replace this before going to production!
   static const String _publishableKey =
       'pk_test_51OxYourTestPublishableKeyHere';
 
-  // ── Your backend URL that creates PaymentIntents ───────────────────────────
-  // In production this should be YOUR server endpoint.
-  // For testing we simulate the response locally.
-  static const String _backendUrl =
-      'https://your-backend.com/create-payment-intent';
-
-  /// Call once at app startup (in main.dart)
   static void init() {
     Stripe.publishableKey = _publishableKey;
     Stripe.merchantIdentifier = 'wanderly.app';
   }
 
-  /// Full payment flow:
-  /// 1. Create PaymentIntent on backend
-  /// 2. Initialize the payment sheet
-  /// 3. Present the sheet to the user
-  /// Returns true on success, false on failure/cancellation
-  Future<bool> processPayment({
-    required double amount, // in USD
-    required String currency,
+  /// Full payment flow for a booking.
+  /// [bookingId] — the pending booking from /flights/book or /stays/book
+  /// Returns true on success.
+  Future<bool> processBookingPayment({
+    required String bookingId,
     required String customerEmail,
-    required String description,
   }) async {
     try {
-      // Step 1 — Get client secret from backend
-      final clientSecret = await _createPaymentIntent(
-        amount: (amount * 100).toInt(), // Stripe uses cents
-        currency: currency,
-        customerEmail: customerEmail,
-        description: description,
+      // Step 1 — Get PaymentIntent client secret from our backend
+      final intentResult = await ApiClient.instance.post(
+        '/payments/initiate',
+        {'bookingId': bookingId},
+        auth: true,
       );
 
-      if (clientSecret == null) return false;
+      final data = intentResult['data'] as Map<String, dynamic>;
+      final clientSecret = data['clientSecret'] as String?;
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+      final currency = (data['currency'] as String? ?? 'usd').toLowerCase();
 
-      // Step 2 — Init payment sheet
+      if (clientSecret == null || clientSecret.isEmpty) {
+        debugPrint('[Stripe] No clientSecret from backend');
+        return false;
+      }
+
+      // Step 2 — Initialize payment sheet
       await Stripe.instance.initPaymentSheet(
         paymentSheetParameters: SetupPaymentSheetParameters(
           paymentIntentClientSecret: clientSecret,
           merchantDisplayName: 'Wanderly',
-          googlePay: const PaymentSheetGooglePay(
+          googlePay: PaymentSheetGooglePay(
             merchantCountryCode: 'US',
-            currencyCode: 'usd',
-            testEnv: true,
+            currencyCode: currency,
+            testEnv: _publishableKey.startsWith('pk_test_'),
+          ),
+          applePay: const PaymentSheetApplePay(
+            merchantCountryCode: 'US',
           ),
           style: ThemeMode.system,
           appearance: const PaymentSheetAppearance(
@@ -84,92 +90,66 @@ class StripeService {
         ),
       );
 
-      // Step 3 — Present the sheet
+      // Step 3 — Show payment sheet to user
       await Stripe.instance.presentPaymentSheet();
+
+      // Step 4 — Confirm with backend (triggers booking finalization)
+      await ApiClient.instance.post(
+        '/payments/confirm',
+        {'bookingId': bookingId},
+        auth: true,
+      );
+
       return true;
     } on StripeException catch (e) {
-      debugPrint('Stripe error: ${e.error.localizedMessage}');
-      if (e.error.code == FailureCode.Canceled) {
-        return false; // user cancelled — not an error
-      }
+      debugPrint('[Stripe] StripeException: ${e.error.localizedMessage}');
+      if (e.error.code == FailureCode.Canceled) return false;
+      return false;
+    } on ApiException catch (e) {
+      debugPrint('[Stripe] ApiException: ${e.message}');
       return false;
     } catch (e) {
-      debugPrint('Payment error: $e');
+      debugPrint('[Stripe] Unknown error: $e');
       return false;
     }
   }
 
-  Future<String?> _createPaymentIntent({
-    required int amount,
+  /// Standalone payment (non-booking) — amount in full currency units (e.g. 42.50 USD)
+  Future<bool> processPayment({
+    required double amount,
     required String currency,
     required String customerEmail,
     required String description,
   }) async {
+    // For non-booking payments, create intent on backend too
     try {
-      // ── In a real app, hit YOUR backend ────────────────────────────────────
-      // Your server creates a PaymentIntent and returns the client_secret.
-      // Example Node.js / Python backend shown in README below.
-      //
-      // final response = await http.post(
-      //   Uri.parse(_backendUrl),
-      //   headers: {'Content-Type': 'application/json'},
-      //   body: jsonEncode({
-      //     'amount': amount,
-      //     'currency': currency,
-      //     'receipt_email': customerEmail,
-      //     'description': description,
-      //   }),
-      // );
-      // final data = jsonDecode(response.body);
-      // return data['client_secret'] as String?;
+      final intentResult = await ApiClient.instance.post(
+        '/payments/create-intent',
+        {
+          'amount': (amount * 100).toInt(),
+          'currency': currency.toLowerCase(),
+          'description': description,
+        },
+        auth: true,
+      );
+      final clientSecret =
+          intentResult['data']['clientSecret'] as String? ?? '';
+      if (clientSecret.isEmpty) return false;
 
-      // ── For local UI testing without a backend ─────────────────────────────
-      // Returns a simulated client secret so the UI flow works end-to-end.
-      // The Stripe payment sheet will fail at confirmation (expected) but
-      // the entire UI before that works perfectly.
-      await Future.delayed(const Duration(milliseconds: 600));
-      return 'pi_test_simulated_${DateTime.now().millisecondsSinceEpoch}_secret_demo';
-    } catch (e) {
-      debugPrint('PaymentIntent creation error: $e');
-      return null;
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Wanderly',
+          style: ThemeMode.system,
+        ),
+      );
+      await Stripe.instance.presentPaymentSheet();
+      return true;
+    } on StripeException catch (e) {
+      if (e.error.code == FailureCode.Canceled) return false;
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 }
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   BACKEND SETUP (Node.js example)
-   ─────────────────────────────────────────────────────────────────────────────
-
-   1. npm install stripe express cors
-   2. Create server.js:
-
-   const stripe = require('stripe')('sk_test_YOUR_SECRET_KEY');
-   const express = require('express');
-   const app = express();
-   app.use(express.json());
-
-   app.post('/create-payment-intent', async (req, res) => {
-     const { amount, currency, receipt_email, description } = req.body;
-     const paymentIntent = await stripe.paymentIntents.create({
-       amount,
-       currency,
-       receipt_email,
-       description,
-       automatic_payment_methods: { enabled: true },
-     });
-     res.json({ client_secret: paymentIntent.client_secret });
-   });
-
-   app.listen(4242, () => console.log('Server running on port 4242'));
-
-   ─────────────────────────────────────────────────────────────────────────────
-   ANDROID SETUP (android/app/build.gradle)
-   ─────────────────────────────────────────────────────────────────────────────
-
-   android {
-     defaultConfig {
-       minSdkVersion 21   // required by flutter_stripe
-     }
-   }
-
-   ────────────────────────────────────────────────────────────────────────── */
