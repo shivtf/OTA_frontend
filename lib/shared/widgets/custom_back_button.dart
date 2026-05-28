@@ -5,11 +5,13 @@ import '../../core/constants/app_colors.dart';
 class CustomBackButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool useLightStyle;
+  final Color? color;
 
   const CustomBackButton({
     super.key,
     this.onPressed,
     this.useLightStyle = false,
+    this.color,
   });
 
   @override

@@ -1,23 +1,23 @@
-// lib/core/services/auth_service.dart
 import '../network/api_client.dart';
 
 class AuthService {
   final _client = ApiClient.instance;
 
   // ── POST /auth/register ─────────────────────────────────────────
-  /// [body]: { firstName, lastName, email, password, phone? }
-  Future<AuthResult> register(Map<String, dynamic> body) async {
+  Future<RegisterResult> register(Map<String, dynamic> body) async {
     final res = await _client.post('/auth/register', body);
-    return AuthResult.fromJson(res['data'] as Map<String, dynamic>);
+    // Response: { success, message, data: { user: {...} } }
+    final data = res['data'] as Map<String, dynamic>;
+    return RegisterResult.fromJson(data);
   }
 
   // ── POST /auth/login ────────────────────────────────────────────
-  /// [body]: { email, password }
   Future<AuthResult> login(String email, String password) async {
     final res = await _client.post('/auth/login', {
       'email': email,
       'password': password,
     });
+    // Response: { success, message, data: { user: {...}, accessToken, refreshToken } }
     final data = AuthResult.fromJson(res['data'] as Map<String, dynamic>);
     await _client.saveTokens(data.accessToken, data.refreshToken);
     return data;
@@ -27,7 +27,10 @@ class AuthService {
   Future<void> logout() async {
     final refresh = await _client.getRefreshToken();
     if (refresh != null) {
-      await _client.post('/auth/logout', {'refreshToken': refresh}, auth: true);
+      try {
+        await _client.post('/auth/logout', {'refreshToken': refresh},
+            auth: true);
+      } catch (_) {}
     }
     await _client.clearTokens();
   }
@@ -44,15 +47,20 @@ class AuthService {
   }
 
   // ── GET /auth/me ────────────────────────────────────────────────
+  // Response: { success, message, data: { user: {...} } }
   Future<UserProfile> getMe() async {
     final res = await _client.get('/auth/me', auth: true);
-    return UserProfile.fromJson(res['data'] as Map<String, dynamic>);
+    final data = res['data'] as Map<String, dynamic>;
+    // Backend returns data.user or data directly
+    final userMap = data['user'] as Map<String, dynamic>? ?? data;
+    return UserProfile.fromJson(userMap);
   }
 
   // ── PATCH /auth/me ──────────────────────────────────────────────
   Future<UserProfile> updateMe(Map<String, dynamic> body) async {
     final res = await _client.patch('/auth/me', body, auth: true);
-    return UserProfile.fromJson(res['data'] as Map<String, dynamic>);
+    final data = res['data'] as Map<String, dynamic>;
+    return UserProfile.fromJson(data);
   }
 
   // ── POST /auth/forgot-password ──────────────────────────────────
@@ -76,6 +84,20 @@ class AuthService {
 }
 
 // ── Models ──────────────────────────────────────────────────────────
+
+/// Returned from /auth/register — no tokens yet (email verification required)
+class RegisterResult {
+  final UserProfile user;
+  final String message;
+
+  RegisterResult({required this.user, required this.message});
+
+  factory RegisterResult.fromJson(Map<String, dynamic> j) => RegisterResult(
+        user: UserProfile.fromJson(j['user'] as Map<String, dynamic>? ?? j),
+        message: j['message'] as String? ?? '',
+      );
+}
+
 class AuthResult {
   final String accessToken;
   final String refreshToken;
@@ -88,10 +110,10 @@ class AuthResult {
   });
 
   factory AuthResult.fromJson(Map<String, dynamic> j) => AuthResult(
-    accessToken: j['accessToken'] as String? ?? '',
-    refreshToken: j['refreshToken'] as String? ?? '',
-    user: UserProfile.fromJson(j['user'] as Map<String, dynamic>? ?? j),
-  );
+        accessToken: j['accessToken'] as String? ?? '',
+        refreshToken: j['refreshToken'] as String? ?? '',
+        user: UserProfile.fromJson(j['user'] as Map<String, dynamic>? ?? j),
+      );
 }
 
 class UserProfile {
@@ -100,6 +122,9 @@ class UserProfile {
   final String firstName;
   final String lastName;
   final String? phone;
+  final String? dateOfBirth;
+  final String? nationality;
+  final String? passportNumber;
   final bool isVerified;
 
   UserProfile({
@@ -108,26 +133,37 @@ class UserProfile {
     required this.firstName,
     required this.lastName,
     this.phone,
+    this.dateOfBirth,
+    this.nationality,
+    this.passportNumber,
     required this.isVerified,
   });
 
   String get fullName => '$firstName $lastName';
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
-    id: j['id'] as String? ?? '',
-    email: j['email'] as String? ?? '',
-    firstName: j['firstName'] as String? ?? j['first_name'] as String? ?? '',
-    lastName: j['lastName'] as String? ?? j['last_name'] as String? ?? '',
-    phone: j['phone'] as String?,
-    isVerified: j['isVerified'] as bool? ?? false,
-  );
+        id: j['id'] as String? ?? '',
+        email: j['email'] as String? ?? '',
+        // Backend returns snake_case from register, camelCase elsewhere
+        firstName:
+            j['firstName'] as String? ?? j['first_name'] as String? ?? '',
+        lastName: j['lastName'] as String? ?? j['last_name'] as String? ?? '',
+        phone: j['phone'] as String?,
+        dateOfBirth:
+            j['dateOfBirth'] as String? ?? j['date_of_birth'] as String?,
+        nationality: j['nationality'] as String?,
+        passportNumber:
+            j['passportNumber'] as String? ?? j['passport_number'] as String?,
+        isVerified:
+            j['isVerified'] as bool? ?? j['is_verified'] as bool? ?? false,
+      );
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'email': email,
-    'firstName': firstName,
-    'lastName': lastName,
-    'phone': phone,
-    'isVerified': isVerified,
-  };
+        'id': id,
+        'email': email,
+        'firstName': firstName,
+        'lastName': lastName,
+        'phone': phone,
+        'isVerified': isVerified,
+      };
 }

@@ -1,4 +1,3 @@
-// lib/features/auth/screens/signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +8,7 @@ import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/custom_back_button.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/auth_divider.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/custom_text_field.dart';
@@ -24,18 +24,19 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
   bool _agreedToTerms = false;
-  bool _isLoading = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
@@ -43,7 +44,7 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _onSignup() async {
+  Future<void> _onSignup() async {
     if (_formKey.currentState?.validate() != true) return;
     if (!_agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -52,30 +53,130 @@ class _SignupScreenState extends State<SignupScreen> {
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusMedium)),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          ),
         ),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
-      setState(() => _isLoading = false);
-      Navigator.of(context).pushNamed(AppRoutes.registration);
+    final auth = context.read<AuthProvider>();
+    auth.clearError();
+
+    // Format phone: add +91 if not already international
+    String phone = _phoneController.text.trim();
+    if (phone.isNotEmpty && !phone.startsWith('+')) {
+      phone = '+91$phone';
     }
+
+    final success = await auth.register(
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      phone: phone,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      _showVerificationDialog(_emailController.text.trim());
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.error ?? 'Registration failed. Please try again.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showVerificationDialog(String email) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSizes.paddingXL),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryStart.withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.mark_email_unread_rounded,
+                  color: Colors.white,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: AppSizes.paddingLG),
+              Text(
+                'Verify Your Email',
+                style: Theme.of(ctx).textTheme.headlineMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSizes.paddingSM),
+              Text(
+                'We\'ve sent a verification link to\n$email\n\nPlease check your inbox and click the link to activate your account.',
+                style: TextStyle(
+                  fontSize: AppSizes.fontMD,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSizes.paddingXL),
+              GradientButton(
+                text: 'Go to Login',
+                height: AppSizes.buttonHeightSM,
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    AppRoutes.login,
+                    (_) => false,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final themeController = context.watch<ThemeController>();
+    final auth = context.watch<AuthProvider>();
     final padding = Responsive.adaptivePadding(context);
 
     return Scaffold(
-      backgroundColor: isDark
-          ? AppColors.darkBackground
-          : AppColors.lightBackground,
+      backgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: padding),
@@ -85,46 +186,52 @@ class _SignupScreenState extends State<SignupScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSizes.paddingMD),
-
-                // Top bar
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const CustomBackButton(),
-                    _ThemeToggleSmall(
-                        controller: themeController, isDark: isDark),
+                    _ThemeToggle(controller: themeController, isDark: isDark),
                   ],
                 ),
-
                 const SizedBox(height: AppSizes.paddingXL),
-
-                // Header
                 Center(
                   child: AuthHeader(
                     title: AppStrings.createAccount,
                     subtitle: AppStrings.signupSubtitle,
                   ),
                 ),
-
                 const SizedBox(height: AppSizes.paddingXL),
 
-                // Full Name
+                // First Name
                 CustomTextField(
-                  label: 'Full Name',
-                  hint: AppStrings.fullName,
+                  label: 'First Name',
+                  hint: 'John',
                   prefixIcon: Icons.person_outline_rounded,
-                  controller: _nameController,
+                  controller: _firstNameController,
                   keyboardType: TextInputType.name,
                   textInputAction: TextInputAction.next,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
+                    if (v == null || v.trim().isEmpty)
                       return AppStrings.fieldRequired;
-                    }
-                    if (v.trim().length < 2) return 'Name is too short';
                     return null;
                   },
                 ),
+                const SizedBox(height: AppSizes.paddingMD),
 
+                // Last Name
+                CustomTextField(
+                  label: 'Last Name',
+                  hint: 'Doe',
+                  prefixIcon: Icons.person_outline_rounded,
+                  controller: _lastNameController,
+                  keyboardType: TextInputType.name,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty)
+                      return AppStrings.fieldRequired;
+                    return null;
+                  },
+                ),
                 const SizedBox(height: AppSizes.paddingMD),
 
                 // Email
@@ -144,13 +251,12 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: AppSizes.paddingMD),
 
                 // Phone
                 CustomTextField(
                   label: 'Phone Number',
-                  hint: AppStrings.phoneNumber,
+                  hint: '9876543210',
                   prefixIcon: Icons.phone_outlined,
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
@@ -162,7 +268,6 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: AppSizes.paddingMD),
 
                 // Password
@@ -179,7 +284,6 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: AppSizes.paddingMD),
 
                 // Confirm Password
@@ -192,46 +296,32 @@ class _SignupScreenState extends State<SignupScreen> {
                   textInputAction: TextInputAction.done,
                   validator: (v) {
                     if (v == null || v.isEmpty) return AppStrings.fieldRequired;
-                    if (v != _passwordController.text) {
+                    if (v != _passwordController.text)
                       return AppStrings.passwordsNoMatch;
-                    }
                     return null;
                   },
                 ),
-
                 const SizedBox(height: AppSizes.paddingLG),
 
-                // Terms & Conditions
+                // Terms
                 _TermsCheckbox(
                   value: _agreedToTerms,
                   onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
                   isDark: isDark,
                 ),
-
                 const SizedBox(height: AppSizes.paddingXL),
 
-                // Create Account button
                 GradientButton(
                   text: AppStrings.createAccount,
-                  isLoading: _isLoading,
-                  onPressed: _isLoading ? null : _onSignup,
+                  isLoading: auth.isLoading,
+                  onPressed: auth.isLoading ? null : _onSignup,
                 ),
 
                 const SizedBox(height: AppSizes.paddingXL),
-
-                // Divider
                 const AuthDivider(text: AppStrings.orSignUpWith),
-
                 const SizedBox(height: AppSizes.paddingLG),
-
-                // Social buttons
-                SocialLoginButton(
-                  onPressed: () {},
-                ),
-
+                SocialLoginButton(onPressed: () {}),
                 const SizedBox(height: AppSizes.paddingXL),
-
-                // Bottom link
                 Center(
                   child: _BottomAuthLink(
                     text: AppStrings.alreadyAccount,
@@ -239,7 +329,6 @@ class _SignupScreenState extends State<SignupScreen> {
                     onTap: () => Navigator.of(context).pop(),
                   ),
                 ),
-
                 const SizedBox(height: AppSizes.paddingLG),
               ],
             ),
@@ -254,12 +343,8 @@ class _TermsCheckbox extends StatelessWidget {
   final bool value;
   final ValueChanged<bool?> onChanged;
   final bool isDark;
-
-  const _TermsCheckbox({
-    required this.value,
-    required this.onChanged,
-    required this.isDark,
-  });
+  const _TermsCheckbox(
+      {required this.value, required this.onChanged, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -282,22 +367,18 @@ class _TermsCheckbox extends StatelessWidget {
               Text(
                 AppStrings.agreeTerms,
                 style: TextStyle(
-                  fontSize: AppSizes.fontSM,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary,
-                ),
+                    fontSize: AppSizes.fontSM,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary),
               ),
               GestureDetector(
                 onTap: () {},
-                child: const Text(
-                  AppStrings.termsConditions,
-                  style: TextStyle(
-                    fontSize: AppSizes.fontSM,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryStart,
-                  ),
-                ),
+                child: const Text(AppStrings.termsConditions,
+                    style: TextStyle(
+                        fontSize: AppSizes.fontSM,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryStart)),
               ),
             ],
           ),
@@ -307,10 +388,10 @@ class _TermsCheckbox extends StatelessWidget {
   }
 }
 
-class _ThemeToggleSmall extends StatelessWidget {
+class _ThemeToggle extends StatelessWidget {
   final ThemeController controller;
   final bool isDark;
-  const _ThemeToggleSmall({required this.controller, required this.isDark});
+  const _ThemeToggle({required this.controller, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -323,16 +404,13 @@ class _ThemeToggleSmall extends StatelessWidget {
           color: isDark ? AppColors.darkCard : AppColors.lightInputBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          ),
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         ),
-        child: Icon(
-          isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-          size: 18,
-          color: isDark
-              ? AppColors.darkTextSecondary
-              : AppColors.lightTextSecondary,
-        ),
+        child: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            size: 18,
+            color: isDark
+                ? AppColors.darkTextSecondary
+                : AppColors.lightTextSecondary),
       ),
     );
   }
@@ -351,25 +429,19 @@ class _BottomAuthLink extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          '$text ',
-          style: TextStyle(
-            fontSize: AppSizes.fontSM,
-            color: isDark
-                ? AppColors.darkTextSecondary
-                : AppColors.lightTextSecondary,
-          ),
-        ),
+        Text('$text ',
+            style: TextStyle(
+                fontSize: AppSizes.fontSM,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary)),
         GestureDetector(
           onTap: onTap,
-          child: const Text(
-            'Login',
-            style: TextStyle(
-              fontSize: AppSizes.fontSM,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primaryStart,
-            ),
-          ),
+          child: const Text('Login',
+              style: TextStyle(
+                  fontSize: AppSizes.fontSM,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryStart)),
         ),
       ],
     );

@@ -1,60 +1,168 @@
-// lib/features/flights/providers/flight_booking_provider.dart
-//
-// Manages the full flight booking flow:
-//   1. Select offer → init booking
-//   2. Select seats (optional)
-//   3. Confirm booking → Stripe payment
-//   4. Show success
-
 import 'package:flutter/foundation.dart';
 import '../../../core/services/flight_service.dart';
+import '../../../core/services/payment_service.dart';
 import '../../../core/network/api_client.dart';
 
 enum BookingStep {
   idle,
-  initiating,
-  seatSelection,
-  confirming,
-  success,
-  failed
+  searching,
+  searchDone,
+  loadingOffers,
+  offersDone,
+  passengerDetails,
+  initiatingBooking,
+  bookingPending, // has bookingId, awaiting payment
+  initiatingPayment,
+  awaitingStripe, // sessionUrl opened, waiting for user to return
+  confirmingPayment,
+  confirmed,
+  failed,
 }
 
 class FlightBookingProvider extends ChangeNotifier {
-  final FlightService _service = FlightService();
+  final FlightService _flightService = FlightService();
+  final PaymentService _paymentService = PaymentService();
 
   BookingStep _step = BookingStep.idle;
   String? _error;
-  FlightBooking? _currentBooking;
-  String? _offerId;
-  int _passengerCount = 1;
 
+  // Search state
+  String? _offerRequestId;
+  int _totalOffers = 0;
+
+  // Offers state
+  List<FlightOffer> _offers = [];
+  FlightOffer? _selectedOffer;
+
+  // Booking state
+  FlightBooking? _currentBooking;
+  List<PassengerInput> _passengers = [];
+
+  // Payment state
+  PaymentSession? _paymentSession;
+  PaymentConfirmResult? _confirmResult;
+
+  // Getters
   BookingStep get step => _step;
   String? get error => _error;
+  String? get offerRequestId => _offerRequestId;
+  int get totalOffers => _totalOffers;
+  List<FlightOffer> get offers => _offers;
+  FlightOffer? get selectedOffer => _selectedOffer;
   FlightBooking? get currentBooking => _currentBooking;
-  String? get offerId => _offerId;
-  int get passengerCount => _passengerCount;
+  PaymentSession? get paymentSession => _paymentSession;
+  PaymentConfirmResult? get confirmResult => _confirmResult;
   bool get isLoading =>
-      _step == BookingStep.initiating || _step == BookingStep.confirming;
+      _step == BookingStep.searching ||
+      _step == BookingStep.loadingOffers ||
+      _step == BookingStep.initiatingBooking ||
+      _step == BookingStep.initiatingPayment ||
+      _step == BookingStep.confirmingPayment;
 
-  /// Step 1: Init booking (creates pending booking in backend)
-  Future<bool> initBooking({
-    required String offerId,
-    required List<PassengerInput> passengers,
-    String tripType = 'one_way',
+  // ── Step 1: Search ───────────────────────────────────────────────
+  Future<bool> searchFlights({
+    required String origin,
+    required String destination,
+    required String departureDate,
+    String? returnDate,
+    int adults = 1,
+    int children = 0,
+    int infants = 0,
+    String cabinClass = 'economy',
   }) async {
-    _step = BookingStep.initiating;
+    _step = BookingStep.searching;
     _error = null;
-    _offerId = offerId;
-    _passengerCount = passengers.length;
+    _offers = [];
+    _selectedOffer = null;
+    _currentBooking = null;
     notifyListeners();
 
     try {
-      _currentBooking = await _service.initBooking(
-        offerId: offerId,
+      final result = await _flightService.searchFlights(
+        origin: origin,
+        destination: destination,
+        departureDate: departureDate,
+        returnDate: returnDate,
+        adults: adults,
+        children: children,
+        infants: infants,
+        cabinClass: cabinClass,
+      );
+      _offerRequestId = result.offerRequestId;
+      _totalOffers = result.totalOffers;
+      _step = BookingStep.searchDone;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _step = BookingStep.failed;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Search failed. Please check your connection and try again.';
+      _step = BookingStep.failed;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── Step 2: Load Offers ──────────────────────────────────────────
+  Future<bool> loadOffers({String sortBy = 'total_amount'}) async {
+    if (_offerRequestId == null) return false;
+
+    _step = BookingStep.loadingOffers;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final result = await _flightService.listOffers(
+        offerRequestId: _offerRequestId!,
+        sortBy: sortBy,
+      );
+      _offers = result.offers;
+      _totalOffers = result.totalOffers;
+      _step = BookingStep.offersDone;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _step = BookingStep.failed;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Failed to load offers. Please try again.';
+      _step = BookingStep.failed;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── Select offer ─────────────────────────────────────────────────
+  void selectOffer(FlightOffer offer) {
+    _selectedOffer = offer;
+    _step = BookingStep.passengerDetails;
+    notifyListeners();
+  }
+
+  // ── Step 3: Init Booking ─────────────────────────────────────────
+  Future<bool> initBooking({
+    required List<PassengerInput> passengers,
+    String tripType = 'ONE_WAY',
+  }) async {
+    if (_selectedOffer == null) return false;
+
+    _step = BookingStep.initiatingBooking;
+    _passengers = passengers;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _currentBooking = await _flightService.initBooking(
+        offerId: _selectedOffer!.offerId,
         passengers: passengers,
         tripType: tripType,
       );
-      _step = BookingStep.seatSelection;
+      _step = BookingStep.bookingPending;
       notifyListeners();
       return true;
     } on ApiException catch (e) {
@@ -70,22 +178,19 @@ class FlightBookingProvider extends ChangeNotifier {
     }
   }
 
-  /// Step 2: Confirm booking with optional selected seat service IDs
-  Future<bool> confirmBooking({
-    List<String> selectedServiceIds = const [],
-  }) async {
+  // ── Step 4: Initiate Payment → get Stripe URL ────────────────────
+  Future<bool> initiatePayment() async {
     if (_currentBooking == null) return false;
 
-    _step = BookingStep.confirming;
+    _step = BookingStep.initiatingPayment;
     _error = null;
     notifyListeners();
 
     try {
-      _currentBooking = await _service.confirmBooking(
-        _currentBooking!.id,
-        selectedServices: selectedServiceIds.map((id) => {'id': id}).toList(),
+      _paymentSession = await _paymentService.initiatePayment(
+        _currentBooking!.bookingId,
       );
-      _step = BookingStep.success;
+      _step = BookingStep.awaitingStripe;
       notifyListeners();
       return true;
     } on ApiException catch (e) {
@@ -94,7 +199,36 @@ class FlightBookingProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _error = 'Confirmation failed. Please try again.';
+      _error = 'Payment initiation failed. Please try again.';
+      _step = BookingStep.failed;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── Step 5: Confirm Payment (called after Stripe redirect) ───────
+  Future<bool> confirmPayment({required String sessionId}) async {
+    if (_currentBooking == null) return false;
+
+    _step = BookingStep.confirmingPayment;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _confirmResult = await _paymentService.confirmPayment(
+        bookingId: _currentBooking!.bookingId,
+        sessionId: sessionId,
+      );
+      _step = BookingStep.confirmed;
+      notifyListeners();
+      return _confirmResult!.isConfirmed;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _step = BookingStep.failed;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Payment confirmation failed.';
       _step = BookingStep.failed;
       notifyListeners();
       return false;
@@ -104,9 +238,19 @@ class FlightBookingProvider extends ChangeNotifier {
   void reset() {
     _step = BookingStep.idle;
     _error = null;
+    _offerRequestId = null;
+    _totalOffers = 0;
+    _offers = [];
+    _selectedOffer = null;
     _currentBooking = null;
-    _offerId = null;
-    _passengerCount = 1;
+    _passengers = [];
+    _paymentSession = null;
+    _confirmResult = null;
+    notifyListeners();
+  }
+
+  void clearError() {
+    _error = null;
     notifyListeners();
   }
 }

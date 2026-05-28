@@ -1,26 +1,44 @@
-// lib/features/flights/widgets/flight_card.dart
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
-import '../models/flight_model.dart';
+import '../../../core/services/flight_service.dart';
 
 class FlightCard extends StatelessWidget {
-  final FlightModel flight;
-  final bool isDark;
+  final FlightOffer offer;
   final VoidCallback onTap;
 
   const FlightCard({
     super.key,
-    required this.flight,
-    required this.isDark,
+    required this.offer,
     required this.onTap,
   });
 
+  String _formatDuration(String iso) {
+    // PT2H5M → 2h 5m
+    final h = RegExp(r'(\d+)H').firstMatch(iso)?.group(1) ?? '0';
+    final m = RegExp(r'(\d+)M').firstMatch(iso)?.group(1) ?? '0';
+    return '${h}h ${m}m';
+  }
+
+  String _formatTime(String iso) {
+    // 2026-07-15T10:50:00 → 10:50
+    if (iso.length < 16) return iso;
+    return iso.substring(11, 16);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final slice = offer.outbound;
+    final departTime = _formatTime(slice.departureAt);
+    final arriveTime = _formatTime(slice.arrivalAt);
+    final duration = _formatDuration(slice.duration);
+    final stops = offer.stops;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkCard : AppColors.lightCard,
           borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
@@ -30,393 +48,313 @@ class FlightCard extends StatelessWidget {
           boxShadow: isDark
               ? null
               : [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Main row
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Top: airline + price
-                  Row(
-                    children: [
-                      // Airline badge
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          gradient: AppColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            flight.airlineCode,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              flight.airline,
-                              style: TextStyle(
-                                fontSize: AppSizes.fontMD,
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? AppColors.darkTextPrimary
-                                    : AppColors.lightTextPrimary,
-                              ),
-                            ),
-                            Text(
-                              flight.aircraft,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark
-                                    ? AppColors.darkTextSecondary
-                                    : AppColors.lightTextSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          ShaderMask(
-                            shaderCallback: (b) =>
-                                AppColors.primaryGradient.createShader(b),
-                            child: Text(
-                              '\$${flight.price.toInt()}',
-                              style: const TextStyle(
-                                fontSize: AppSizes.fontXL,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            'per person',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // Flight path row
-                  Row(
-                    children: [
-                      // Departure
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            flight.departure,
-                            style: TextStyle(
-                              fontSize: AppSizes.fontXL,
-                              fontWeight: FontWeight.w800,
-                              color: isDark
-                                  ? AppColors.darkTextPrimary
-                                  : AppColors.lightTextPrimary,
-                            ),
-                          ),
-                          Text(
-                            flight.from,
-                            style: TextStyle(
-                              fontSize: AppSizes.fontSM,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // Duration line
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Column(
-                            children: [
-                              Text(
-                                flight.duration,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? AppColors.darkTextSecondary
-                                      : AppColors.lightTextSecondary,
-                                ),
+                ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Airline row
+              Row(
+                children: [
+                  // Airline logo or placeholder
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryStart.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: offer.airlineLogoUrl.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              offer.airlineLogoUrl,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.flight_rounded,
+                                color: AppColors.primaryStart,
+                                size: 20,
                               ),
-                              const SizedBox(height: 4),
-                              _FlightPathLine(stops: flight.stops),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: flight.stops == 0
-                                      ? AppColors.success.withOpacity(0.12)
-                                      : AppColors.warning.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  flight.stops == 0
-                                      ? 'Non-stop'
-                                      : '${flight.stops} stop',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: flight.stops == 0
-                                        ? AppColors.success
-                                        : AppColors.warning,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
+                          )
+                        : const Icon(
+                            Icons.flight_rounded,
+                            color: AppColors.primaryStart,
+                            size: 20,
+                          ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          offer.airline,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppSizes.fontMD,
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary,
                           ),
                         ),
+                        Text(
+                          offer.airlineIata,
+                          style: TextStyle(
+                            fontSize: AppSizes.fontXS,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Price
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${offer.currency} ${offer.totalAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryStart,
+                        ),
                       ),
-
-                      // Arrival
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            flight.arrival,
-                            style: TextStyle(
-                              fontSize: AppSizes.fontXL,
-                              fontWeight: FontWeight.w800,
-                              color: isDark
-                                  ? AppColors.darkTextPrimary
-                                  : AppColors.lightTextPrimary,
-                            ),
-                          ),
-                          Text(
-                            flight.to,
-                            style: TextStyle(
-                              fontSize: AppSizes.fontSM,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'per person',
+                        style: TextStyle(
+                          fontSize: AppSizes.fontXS,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
-            ),
 
-            // Bottom strip: amenities + rating + refundable
-            Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.darkInputBg
-                    : AppColors.lightInputBg,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(AppSizes.radiusLarge),
-                  bottomRight: Radius.circular(AppSizes.radiusLarge),
-                ),
-              ),
-              padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
+              const SizedBox(height: 16),
+
+              // Route row
+              Row(
                 children: [
-                  // Amenities icons
-                  if (flight.hasMeal)
-                    _AmenityIcon(
-                      icon: Icons.restaurant_rounded,
-                      tooltip: 'Meal',
-                      isDark: isDark,
-                    ),
-                  if (flight.hasWifi)
-                    _AmenityIcon(
-                      icon: Icons.wifi_rounded,
-                      tooltip: 'Wi-Fi',
-                      isDark: isDark,
-                    ),
-                  if (flight.hasEntertainment)
-                    _AmenityIcon(
-                      icon: Icons.tv_rounded,
-                      tooltip: 'Entertainment',
-                      isDark: isDark,
-                    ),
-
-                  const Spacer(),
-
-                  // Seats left
-                  if (flight.seatsLeft <= 5)
-                    Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        '${flight.seatsLeft} left',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.error,
-                        ),
-                      ),
-                    ),
-
-                  // Rating
-                  Row(
+                  // Departure
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.star_rounded,
-                          color: AppColors.accentGold, size: 13),
-                      const SizedBox(width: 3),
                       Text(
-                        '${flight.rating}',
+                        departTime,
                         style: TextStyle(
-                          fontSize: AppSizes.fontSM,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
                           color: isDark
                               ? AppColors.darkTextPrimary
                               : AppColors.lightTextPrimary,
                         ),
                       ),
+                      Text(
+                        slice.origin.iataCode,
+                        style: const TextStyle(
+                          fontSize: AppSizes.fontSM,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryStart,
+                        ),
+                      ),
+                      Text(
+                        slice.origin.cityName,
+                        style: TextStyle(
+                          fontSize: AppSizes.fontXS,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
+                      ),
                     ],
                   ),
 
-                  const SizedBox(width: 10),
-
-                  // Refundable badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: flight.isRefundable
-                          ? AppColors.success.withOpacity(0.12)
-                          : AppColors.lightTextSecondary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(5),
+                  // Duration / stops bar
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          duration,
+                          style: TextStyle(
+                            fontSize: AppSizes.fontXS,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.primaryStart,
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                height: 1.5,
+                                color: AppColors.primaryStart
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                            Icon(
+                              Icons.flight_rounded,
+                              color: AppColors.primaryStart,
+                              size: 18,
+                            ),
+                            Expanded(
+                              child: Container(
+                                height: 1.5,
+                                color: AppColors.primaryStart
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.primaryStart,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          stops == 0
+                              ? 'Direct'
+                              : '$stops Stop${stops > 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: AppSizes.fontXS,
+                            color: stops == 0
+                                ? AppColors.success
+                                : AppColors.warning,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      flight.isRefundable ? 'Refundable' : 'Non-refund',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: flight.isRefundable
-                            ? AppColors.success
-                            : AppColors.lightTextSecondary,
+                  ),
+
+                  // Arrival
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        arriveTime,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary,
+                        ),
                       ),
+                      Text(
+                        slice.destination.iataCode,
+                        style: const TextStyle(
+                          fontSize: AppSizes.fontSM,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryStart,
+                        ),
+                      ),
+                      Text(
+                        slice.destination.cityName,
+                        style: TextStyle(
+                          fontSize: AppSizes.fontXS,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+              Divider(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                height: 1,
+              ),
+              const SizedBox(height: 10),
+
+              // Bottom badges
+              Row(
+                children: [
+                  if (offer.conditions?.refundable == true)
+                    _Badge(
+                      icon: Icons.undo_rounded,
+                      label: 'Refundable',
+                      color: AppColors.success,
+                    ),
+                  if (offer.conditions?.changeable == true) ...[
+                    const SizedBox(width: 8),
+                    _Badge(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Changeable',
+                      color: AppColors.primaryStart,
+                    ),
+                  ],
+                  const Spacer(),
+                  Text(
+                    'Select →',
+                    style: TextStyle(
+                      fontSize: AppSizes.fontSM,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryStart,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _FlightPathLine extends StatelessWidget {
-  final int stops;
-  const _FlightPathLine({required this.stops});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: const BoxDecoration(
-            color: AppColors.primaryStart,
-            shape: BoxShape.circle,
-          ),
-        ),
-        Expanded(
-          child: CustomPaint(painter: _DashedLinePainter()),
-        ),
-        const Icon(Icons.flight_rounded, color: AppColors.primaryStart, size: 16),
-        Expanded(
-          child: CustomPaint(painter: _DashedLinePainter()),
-        ),
-        Container(
-          width: 6,
-          height: 6,
-          decoration: const BoxDecoration(
-            color: AppColors.primaryEnd,
-            shape: BoxShape.circle,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DashedLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.primaryStart.withOpacity(0.3)
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    double x = 0;
-    while (x < size.width) {
-      canvas.drawLine(Offset(x, size.height / 2),
-          Offset((x + 4).clamp(0, size.width), size.height / 2), paint);
-      x += 7;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
-}
-
-class _AmenityIcon extends StatelessWidget {
+class _Badge extends StatelessWidget {
   final IconData icon;
-  final String tooltip;
-  final bool isDark;
+  final String label;
+  final Color color;
 
-  const _AmenityIcon(
-      {required this.icon, required this.tooltip, required this.isDark});
+  const _Badge({required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        margin: const EdgeInsets.only(right: 6),
-        width: 26,
-        height: 26,
-        decoration: BoxDecoration(
-          color: AppColors.primaryStart.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Icon(icon, size: 14, color: AppColors.primaryStart),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }

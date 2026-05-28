@@ -1,8 +1,3 @@
-// lib/features/auth/providers/auth_provider.dart
-//
-// Drop-in replacement for the dummy auth used in login_screen.dart.
-// Wrap your MaterialApp with ChangeNotifierProvider<AuthProvider>.
-
 import 'package:flutter/foundation.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/network/api_client.dart';
@@ -13,11 +8,21 @@ class AuthProvider extends ChangeNotifier {
   UserProfile? _user;
   bool _isLoading = false;
   String? _error;
+  // Set after registration — prompts "check your email" UI
+  bool _awaitingVerification = false;
+  String? _pendingEmail;
 
   UserProfile? get user => _user;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _user != null;
   String? get error => _error;
+  bool get awaitingVerification => _awaitingVerification;
+  String? get pendingEmail => _pendingEmail;
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
 
   // ── Load saved session ──────────────────────────────────────────
   Future<void> tryAutoLogin() async {
@@ -32,23 +37,33 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ── Register ────────────────────────────────────────────────────
+  /// Returns true on success. After success, user must verify email.
   Future<bool> register({
     required String firstName,
     required String lastName,
     required String email,
     required String password,
     String? phone,
+    String? dateOfBirth,
+    String? nationality,
+    String? passportNumber,
   }) async {
     _setLoading(true);
     try {
-      final result = await _service.register({
+      final body = <String, dynamic>{
         'firstName': firstName,
         'lastName': lastName,
         'email': email,
         'password': password,
-        if (phone != null) 'phone': phone,
-      });
-      _user = result.user;
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (dateOfBirth != null) 'dateOfBirth': dateOfBirth,
+        if (nationality != null) 'nationality': nationality,
+        if (passportNumber != null && passportNumber.isNotEmpty)
+          'passportNumber': passportNumber,
+      };
+      await _service.register(body);
+      _awaitingVerification = true;
+      _pendingEmail = email;
       _error = null;
       notifyListeners();
       return true;
@@ -68,6 +83,7 @@ class AuthProvider extends ChangeNotifier {
       final result = await _service.login(email, password);
       _user = result.user;
       _error = null;
+      _awaitingVerification = false;
       notifyListeners();
       return true;
     } on ApiException catch (e) {
@@ -103,7 +119,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ── Forgot / reset password ─────────────────────────────────────
+  // ── Forgot password ─────────────────────────────────────────────
   Future<bool> forgotPassword(String email) async {
     _setLoading(true);
     try {

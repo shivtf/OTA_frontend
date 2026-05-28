@@ -1,17 +1,16 @@
-// lib/features/auth/screens/registration_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/custom_back_button.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/gradient_button.dart';
+import '../../../core/services/flight_service.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -22,118 +21,72 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _dobController = TextEditingController(); // YYYY-MM-DD
+  final _passportController = TextEditingController();
+  final _passportExpiryController = TextEditingController();
 
-  bool _isLoading = false;
-  final Map<String, String?> _fieldErrors = {};
+  String _title = 'mr';
+  String _gender = 'm';
+  String _passengerType = 'adult';
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _dobController.dispose();
+    _passportController.dispose();
+    _passportExpiryController.dispose();
     super.dispose();
   }
 
-  void _onSubmit() async {
+  void _onSubmit() {
     if (_formKey.currentState?.validate() != true) return;
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _showSuccessDialog();
+    String phone = _phoneController.text.trim();
+    if (phone.isNotEmpty && !phone.startsWith('+')) {
+      phone = '+91$phone';
     }
-  }
 
-  void _showSuccessDialog() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor:
-        isDark ? AppColors.darkCard : AppColors.lightCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingXL),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryStart.withValues(alpha:0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Colors.white,
-                  size: 36,
-                ),
-              ),
-              const SizedBox(height: AppSizes.paddingLG),
-              Text(
-                'Registration Complete!',
-                style: Theme.of(context).textTheme.headlineMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSizes.paddingSM),
-              Text(
-                'Your account has been created successfully. Welcome to Wanderly!',
-                style: TextStyle(
-                  fontSize: AppSizes.fontMD,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSizes.paddingXL),
-              GradientButton(
-                text: 'Go to Login',
-                height: AppSizes.buttonHeightSM,
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context)
-                      .pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+    final passenger = PassengerInput(
+      type: _passengerType,
+      title: _title,
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      dateOfBirth: _dobController.text.trim(),
+      gender: _gender,
+      email: _emailController.text.trim(),
+      phone: phone,
+      passportNumber: _passportController.text.trim().isEmpty
+          ? null
+          : _passportController.text.trim(),
+      passportExpiryDate: _passportExpiryController.text.trim().isEmpty
+          ? null
+          : _passportExpiryController.text.trim(),
     );
+
+    Navigator.of(context).pop(passenger);
   }
 
   @override
   Widget build(BuildContext context) {
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final passengerIndex = (args?['passengerIndex'] as int?) ?? 0;
+    final passengerCount = (args?['passengerCount'] as int?) ?? 1;
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final themeController = context.watch<ThemeController>();
     final padding = Responsive.adaptivePadding(context);
 
     return Scaffold(
-      backgroundColor: isDark
-          ? AppColors.darkBackground
-          : AppColors.lightBackground,
+      backgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: padding),
@@ -143,8 +96,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSizes.paddingMD),
-
-                // Top bar
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -152,75 +103,97 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     _ThemeToggle(controller: themeController, isDark: isDark),
                   ],
                 ),
-
                 const SizedBox(height: AppSizes.paddingXL),
-
-                // Header
                 Center(
                   child: AuthHeader(
-                    title: AppStrings.createAccount,
-                    subtitle: AppStrings.registerSubtitle,
+                    title: 'Passenger ${passengerIndex + 1} of $passengerCount',
+                    subtitle: 'Enter passenger details for your booking',
                   ),
                 ),
-
                 const SizedBox(height: AppSizes.paddingXL),
 
-                // Progress indicator
-                _buildProgressIndicator(isDark),
-
-                const SizedBox(height: AppSizes.paddingXL),
-
-                // Section label
-                _SectionLabel(
-                    label: 'Personal Information', isDark: isDark),
-
+                // Title & Passenger type row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DropdownField(
+                        label: 'Title',
+                        value: _title,
+                        items: const {
+                          'mr': 'Mr',
+                          'ms': 'Ms',
+                          'mrs': 'Mrs',
+                          'dr': 'Dr',
+                        },
+                        onChanged: (v) => setState(() => _title = v!),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DropdownField(
+                        label: 'Type',
+                        value: _passengerType,
+                        items: const {
+                          'adult': 'Adult',
+                          'child': 'Child',
+                          'infant_without_seat': 'Infant',
+                        },
+                        onChanged: (v) => setState(() => _passengerType = v!),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: AppSizes.paddingMD),
 
-                // Full Name
+                _SectionLabel(label: 'Personal Information', isDark: isDark),
+                const SizedBox(height: AppSizes.paddingMD),
+
                 CustomTextField(
-                  label: 'Full Name *',
-                  hint: AppStrings.fullName,
+                  label: 'First Name *',
+                  hint: 'John',
                   prefixIcon: Icons.person_outline_rounded,
-                  controller: _nameController,
+                  controller: _firstNameController,
                   keyboardType: TextInputType.name,
                   textInputAction: TextInputAction.next,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return AppStrings.fieldRequired;
-                    }
-                    if (v.trim().split(' ').length < 2) {
-                      return 'Please enter your full name';
-                    }
-                    return null;
-                  },
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? AppStrings.fieldRequired
+                      : null,
                 ),
-
                 const SizedBox(height: AppSizes.paddingMD),
 
-                // Email
                 CustomTextField(
-                  label: 'Email Address *',
-                  hint: AppStrings.emailAddress,
+                  label: 'Last Name *',
+                  hint: 'Doe',
+                  prefixIcon: Icons.person_outline_rounded,
+                  controller: _lastNameController,
+                  keyboardType: TextInputType.name,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? AppStrings.fieldRequired
+                      : null,
+                ),
+                const SizedBox(height: AppSizes.paddingMD),
+
+                CustomTextField(
+                  label: 'Email *',
+                  hint: 'john@example.com',
                   prefixIcon: Icons.email_outlined,
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     if (v == null || v.isEmpty) return AppStrings.fieldRequired;
-                    if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
-                        .hasMatch(v)) {
-                      return AppStrings.invalidEmail;
-                    }
+                    if (!v.contains('@')) return AppStrings.invalidEmail;
                     return null;
                   },
                 ),
-
                 const SizedBox(height: AppSizes.paddingMD),
 
-                // Phone
                 CustomTextField(
-                  label: 'Phone Number *',
-                  hint: AppStrings.phoneNumber,
+                  label: 'Phone *',
+                  hint: '9876543210',
                   prefixIcon: Icons.phone_outlined,
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
@@ -232,97 +205,65 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     return null;
                   },
                 ),
-
-                const SizedBox(height: AppSizes.paddingXL),
-
-                _SectionLabel(label: 'Security', isDark: isDark),
-
                 const SizedBox(height: AppSizes.paddingMD),
 
-                // Password
+                // Gender
+                _DropdownField(
+                  label: 'Gender',
+                  value: _gender,
+                  items: const {'m': 'Male', 'f': 'Female'},
+                  onChanged: (v) => setState(() => _gender = v!),
+                  isDark: isDark,
+                ),
+                const SizedBox(height: AppSizes.paddingMD),
+
                 CustomTextField(
-                  label: 'Password *',
-                  hint: AppStrings.password,
-                  prefixIcon: Icons.lock_outline_rounded,
-                  isPassword: true,
-                  controller: _passwordController,
+                  label: 'Date of Birth *',
+                  hint: 'YYYY-MM-DD',
+                  prefixIcon: Icons.cake_outlined,
+                  controller: _dobController,
+                  keyboardType: TextInputType.datetime,
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     if (v == null || v.isEmpty) return AppStrings.fieldRequired;
-                    if (v.length < 8) return AppStrings.passwordTooShort;
+                    final dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+                    if (!dateRegex.hasMatch(v)) return 'Use format YYYY-MM-DD';
                     return null;
                   },
                 ),
-
-                const SizedBox(height: AppSizes.paddingSM),
-
-                // Password strength indicator
-                _PasswordStrength(controller: _passwordController),
-
-                const SizedBox(height: AppSizes.paddingMD),
-
-                // Confirm Password
-                CustomTextField(
-                  label: 'Confirm Password *',
-                  hint: AppStrings.confirmPassword,
-                  prefixIcon: Icons.lock_reset_outlined,
-                  isPassword: true,
-                  controller: _confirmPasswordController,
-                  textInputAction: TextInputAction.done,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return AppStrings.fieldRequired;
-                    if (v != _passwordController.text) {
-                      return AppStrings.passwordsNoMatch;
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: AppSizes.paddingXXL),
-
-                // Submit button
-                GradientButton(
-                  text: AppStrings.completeRegistration,
-                  isLoading: _isLoading,
-                  onPressed: _isLoading ? null : _onSubmit,
-                  icon: Icons.arrow_forward_rounded,
-                ),
-
                 const SizedBox(height: AppSizes.paddingXL),
 
-                // Back to login
-                Center(
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context)
-                        .pushNamedAndRemoveUntil(
-                        AppRoutes.login, (_) => false),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 12,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightTextSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Back to Login',
-                          style: TextStyle(
-                            fontSize: AppSizes.fontSM,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _SectionLabel(
+                    label: 'Travel Document (Optional)', isDark: isDark),
+                const SizedBox(height: AppSizes.paddingMD),
 
-                const SizedBox(height: AppSizes.paddingLG),
+                CustomTextField(
+                  label: 'Passport Number',
+                  hint: 'A1234567',
+                  prefixIcon: Icons.badge_outlined,
+                  controller: _passportController,
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: AppSizes.paddingMD),
+
+                CustomTextField(
+                  label: 'Passport Expiry',
+                  hint: 'YYYY-MM-DD',
+                  prefixIcon: Icons.event_outlined,
+                  controller: _passportExpiryController,
+                  keyboardType: TextInputType.datetime,
+                  textInputAction: TextInputAction.done,
+                ),
+                const SizedBox(height: AppSizes.paddingXXL),
+
+                GradientButton(
+                  text: passengerIndex + 1 < passengerCount
+                      ? 'Next Passenger'
+                      : 'Continue to Payment',
+                  icon: Icons.arrow_forward_rounded,
+                  onPressed: _onSubmit,
+                ),
+                const SizedBox(height: AppSizes.paddingXL),
               ],
             ),
           ),
@@ -330,108 +271,63 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ),
     );
   }
-
-  Widget _buildProgressIndicator(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.paddingMD,
-        vertical: AppSizes.paddingMD,
-      ),
-      decoration: BoxDecoration(
-        color: isDark
-            ? AppColors.darkCard
-            : AppColors.primaryStart.withValues(alpha:0.06),
-        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-        border: Border.all(
-          color: isDark
-              ? AppColors.darkBorder
-              : AppColors.primaryStart.withValues(alpha:0.15),
-        ),
-      ),
-      child: Row(
-        children: [
-          _StepDot(number: '1', label: 'Sign Up', isDone: true),
-          Expanded(
-            child: Container(
-              height: 2,
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ),
-          _StepDot(number: '2', label: 'Register', isActive: true),
-          Expanded(
-            child: Container(
-              height: 2,
-              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            ),
-          ),
-          _StepDot(number: '3', label: 'Done'),
-        ],
-      ),
-    );
-  }
 }
 
-class _StepDot extends StatelessWidget {
-  final String number;
+class _DropdownField extends StatelessWidget {
   final String label;
-  final bool isDone;
-  final bool isActive;
+  final String value;
+  final Map<String, String> items;
+  final ValueChanged<String?> onChanged;
+  final bool isDark;
 
-  const _StepDot({
-    required this.number,
+  const _DropdownField({
     required this.label,
-    this.isDone = false,
-    this.isActive = false,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isHighlighted = isDone || isActive;
-
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(label,
+            style: TextStyle(
+              fontSize: AppSizes.fontSM,
+              fontWeight: FontWeight.w600,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+            )),
+        const SizedBox(height: 6),
         Container(
-          width: 32,
-          height: 32,
           decoration: BoxDecoration(
-            gradient: isHighlighted ? AppColors.primaryGradient : null,
-            color: isHighlighted
-                ? null
-                : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
-            shape: BoxShape.circle,
+            color: isDark ? AppColors.darkCard : AppColors.lightInputBg,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            border: Border.all(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
           ),
-          child: Center(
-            child: isDone
-                ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
-                : Text(
-              number,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: isActive
-                    ? Colors.white
-                    : (isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary),
-              ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: isDark ? AppColors.darkCard : Colors.white,
+              items: items.entries
+                  .map((e) => DropdownMenuItem(
+                        value: e.key,
+                        child: Text(e.value,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.lightTextPrimary,
+                            )),
+                      ))
+                  .toList(),
+              onChanged: onChanged,
             ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: AppSizes.fontXS,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-            color: isHighlighted
-                ? AppColors.primaryStart
-                : (isDark
-                ? AppColors.darkTextSecondary
-                : AppColors.lightTextSecondary),
           ),
         ),
       ],
@@ -442,7 +338,6 @@ class _StepDot extends StatelessWidget {
 class _SectionLabel extends StatelessWidget {
   final String label;
   final bool isDark;
-
   const _SectionLabel({required this.label, required this.isDark});
 
   @override
@@ -458,108 +353,14 @@ class _SectionLabel extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: AppSizes.fontMD,
-            fontWeight: FontWeight.w700,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PasswordStrength extends StatefulWidget {
-  final TextEditingController controller;
-
-  const _PasswordStrength({required this.controller});
-
-  @override
-  State<_PasswordStrength> createState() => _PasswordStrengthState();
-}
-
-class _PasswordStrengthState extends State<_PasswordStrength> {
-  int _strength = 0;
-  String _label = '';
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_evaluate);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_evaluate);
-    super.dispose();
-  }
-
-  void _evaluate() {
-    final v = widget.controller.text;
-    int score = 0;
-    if (v.length >= 8) score++;
-    if (v.contains(RegExp(r'[A-Z]'))) score++;
-    if (v.contains(RegExp(r'[0-9]'))) score++;
-    if (v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) score++;
-
-    setState(() {
-      _strength = score;
-      _label = ['', 'Weak', 'Fair', 'Good', 'Strong'][score];
-    });
-  }
-
-  Color get _color {
-    switch (_strength) {
-      case 1:
-        return AppColors.error;
-      case 2:
-        return AppColors.warning;
-      case 3:
-        return const Color(0xFF4CAF50);
-      case 4:
-        return AppColors.success;
-      default:
-        return Colors.transparent;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_strength == 0) return const SizedBox.shrink();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: List.generate(4, (i) {
-            return Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                height: 4,
-                decoration: BoxDecoration(
-                  color: i < _strength
-                      ? _color
-                      : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Password strength: $_label',
-          style: TextStyle(
-            fontSize: AppSizes.fontXS,
-            color: _color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        Text(label,
+            style: TextStyle(
+              fontSize: AppSizes.fontMD,
+              fontWeight: FontWeight.w700,
+              color: isDark
+                  ? AppColors.darkTextPrimary
+                  : AppColors.lightTextPrimary,
+            )),
       ],
     );
   }
@@ -581,16 +382,13 @@ class _ThemeToggle extends StatelessWidget {
           color: isDark ? AppColors.darkCard : AppColors.lightInputBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          ),
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         ),
-        child: Icon(
-          isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-          size: 18,
-          color: isDark
-              ? AppColors.darkTextSecondary
-              : AppColors.lightTextSecondary,
-        ),
+        child: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            size: 18,
+            color: isDark
+                ? AppColors.darkTextSecondary
+                : AppColors.lightTextSecondary),
       ),
     );
   }

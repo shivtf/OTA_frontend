@@ -7,6 +7,7 @@ import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/custom_back_button.dart';
 import '../../auth/widgets/gradient_button.dart';
+import '../providers/flight_booking_provider.dart';
 
 class FlightSearchScreen extends StatefulWidget {
   const FlightSearchScreen({super.key});
@@ -20,11 +21,38 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
   String _tripType = 'One Way';
   final _fromController = TextEditingController(text: 'DEL');
   final _toController = TextEditingController(text: 'DXB');
-  String _departDate = 'Jun 15, 2025';
-  String _returnDate = 'Jun 22, 2025';
+  // Store as DateTime internally, display formatted
+  DateTime _departDateTime = DateTime.now().add(const Duration(days: 14));
+  DateTime _returnDateTime = DateTime.now().add(const Duration(days: 21));
   int _adults = 1;
   int _children = 0;
   String _cabin = 'Economy';
+  bool _isSearching = false;
+
+  String get _departDate =>
+      '${_departDateTime.year}-${_departDateTime.month.toString().padLeft(2, '0')}-${_departDateTime.day.toString().padLeft(2, '0')}';
+  String get _returnDate =>
+      '${_returnDateTime.year}-${_returnDateTime.month.toString().padLeft(2, '0')}-${_returnDateTime.day.toString().padLeft(2, '0')}';
+  String get _departDisplay =>
+      '${_departDateTime.day} ${_monthName(_departDateTime.month)}, ${_departDateTime.year}';
+  String get _returnDisplay =>
+      '${_returnDateTime.day} ${_monthName(_returnDateTime.month)}, ${_returnDateTime.year}';
+
+  String _monthName(int m) => const [
+        '',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ][m];
 
   late TabController _tabController;
 
@@ -52,6 +80,66 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
     setState(() {});
   }
 
+  Future<void> _onSearch() async {
+    final from = _fromController.text.trim().toUpperCase();
+    final to = _toController.text.trim().toUpperCase();
+    if (from.isEmpty || to.isEmpty || from.length != 3 || to.length != 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Please enter valid 3-letter airport codes (e.g. DEL, BOM)'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    final provider = context.read<FlightBookingProvider>();
+    provider.reset();
+
+    final cabinMap = {
+      'Economy': 'economy',
+      'Business': 'business',
+      'First Class': 'first',
+    };
+
+    final ok = await provider.searchFlights(
+      origin: from,
+      destination: to,
+      departureDate: _departDate,
+      returnDate: _tripType == 'Round Trip' ? _returnDate : null,
+      adults: _adults,
+      children: _children,
+      cabinClass: cabinMap[_cabin] ?? 'economy',
+    );
+
+    if (!mounted) return;
+    setState(() => _isSearching = false);
+
+    if (ok) {
+      Navigator.of(context).pushNamed(
+        AppRoutes.flightResults,
+        arguments: {
+          'from': from,
+          'to': to,
+          'fromCity': from,
+          'toCity': to,
+          'departureDate': _departDate,
+        },
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.error ?? 'Search failed. Please try again.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -59,7 +147,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
 
     return Scaffold(
       backgroundColor:
-      isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: CustomScrollView(
         slivers: [
           // App bar
@@ -93,8 +181,8 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                   GradientButton(
                     text: 'Search Flights',
                     icon: Icons.search_rounded,
-                    onPressed: () => Navigator.of(context)
-                        .pushNamed(AppRoutes.flightResults),
+                    isLoading: _isSearching,
+                    onPressed: _isSearching ? null : _onSearch,
                   ),
 
                   const SizedBox(height: 32),
@@ -115,15 +203,15 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        )
+                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
             : const LinearGradient(
-          colors: [Color(0xFF6C3CE1), Color(0xFF9B5CFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+                colors: [Color(0xFF6C3CE1), Color(0xFF9B5CFF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
@@ -153,7 +241,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha:0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -189,8 +277,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 decoration: BoxDecoration(
-                  gradient:
-                  isActive ? AppColors.primaryGradient : null,
+                  gradient: isActive ? AppColors.primaryGradient : null,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
@@ -198,13 +285,12 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                     t,
                     style: TextStyle(
                       fontSize: AppSizes.fontSM,
-                      fontWeight:
-                      isActive ? FontWeight.w700 : FontWeight.w400,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
                       color: isActive
                           ? Colors.white
                           : (isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary),
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary),
                     ),
                   ),
                 ),
@@ -226,12 +312,12 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         boxShadow: isDark
             ? null
             : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -275,7 +361,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryStart.withValues(alpha:0.4),
+                      color: AppColors.primaryStart.withValues(alpha: 0.4),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -312,7 +398,8 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
             isDark: isDark,
             disabled: _tripType == 'One Way',
             onTap: () {
-              if (_tripType != 'One Way') _pickDate(context, isDark, isDepart: false);
+              if (_tripType != 'One Way')
+                _pickDate(context, isDark, isDepart: false);
             },
           ),
         ),
@@ -326,7 +413,8 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         Expanded(
           child: _InfoCard(
             label: 'Passengers',
-            value: '${_adults + _children} Traveller${_adults + _children > 1 ? 's' : ''}',
+            value:
+                '${_adults + _children} Traveller${_adults + _children > 1 ? 's' : ''}',
             icon: Icons.people_rounded,
             isDark: isDark,
             onTap: () => _showPassengerSheet(context, isDark),
@@ -361,21 +449,22 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
           style: TextStyle(
             fontSize: AppSizes.fontLG,
             fontWeight: FontWeight.w700,
-            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+            color:
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
           ),
         ),
         const SizedBox(height: 14),
         ...recents.map((r) => _RecentSearchTile(
-          from: r['from']!,
-          to: r['to']!,
-          date: r['date']!,
-          isDark: isDark,
-          onTap: () {
-            _fromController.text = r['from']!;
-            _toController.text = r['to']!;
-            setState(() {});
-          },
-        )),
+              from: r['from']!,
+              to: r['to']!,
+              date: r['date']!,
+              isDark: isDark,
+              onTap: () {
+                _fromController.text = r['from']!;
+                _toController.text = r['to']!;
+                setState(() {});
+              },
+            )),
       ],
     );
   }
@@ -396,8 +485,10 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       final formatted =
           '${_monthName(picked.month)} ${picked.day}, ${picked.year}';
       setState(() {
-        if (isDepart) _departDate = formatted;
-        else _returnDate = formatted;
+        if (isDepart)
+          _departDateTime = picked;
+        else
+          _returnDateTime = picked;
       });
     }
   }
@@ -439,10 +530,16 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                 value: _adults,
                 isDark: isDark,
                 onDecrement: () {
-                  if (_adults > 1) setLocal(() { setState(() => _adults--); });
+                  if (_adults > 1)
+                    setLocal(() {
+                      setState(() => _adults--);
+                    });
                 },
                 onIncrement: () {
-                  if (_adults < 9) setLocal(() { setState(() => _adults++); });
+                  if (_adults < 9)
+                    setLocal(() {
+                      setState(() => _adults++);
+                    });
                 },
               ),
               const SizedBox(height: 16),
@@ -452,10 +549,16 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                 value: _children,
                 isDark: isDark,
                 onDecrement: () {
-                  if (_children > 0) setLocal(() { setState(() => _children--); });
+                  if (_children > 0)
+                    setLocal(() {
+                      setState(() => _children--);
+                    });
                 },
                 onIncrement: () {
-                  if (_children < 8) setLocal(() { setState(() => _children++); });
+                  if (_children < 8)
+                    setLocal(() {
+                      setState(() => _children++);
+                    });
                 },
               ),
               const SizedBox(height: 24),
@@ -502,71 +605,80 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                 )),
             const SizedBox(height: 20),
             ..._cabins.map((c) => GestureDetector(
-              onTap: () {
-                setState(() => _cabin = c);
-                Navigator.pop(context);
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: _cabin == c
-                      ? AppColors.primaryGradient
-                      : null,
-                  color: _cabin != c
-                      ? (isDark
-                      ? AppColors.darkInputBg
-                      : AppColors.lightInputBg)
-                      : null,
-                  borderRadius: BorderRadius.circular(14),
-                  border: _cabin != c
-                      ? Border.all(
-                      color: isDark
-                          ? AppColors.darkBorder
-                          : AppColors.lightBorder)
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.airline_seat_recline_extra_rounded,
-                      color: _cabin == c
-                          ? Colors.white
-                          : AppColors.primaryStart,
-                      size: 20,
+                  onTap: () {
+                    setState(() => _cabin = c);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: _cabin == c ? AppColors.primaryGradient : null,
+                      color: _cabin != c
+                          ? (isDark
+                              ? AppColors.darkInputBg
+                              : AppColors.lightInputBg)
+                          : null,
+                      borderRadius: BorderRadius.circular(14),
+                      border: _cabin != c
+                          ? Border.all(
+                              color: isDark
+                                  ? AppColors.darkBorder
+                                  : AppColors.lightBorder)
+                          : null,
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      c,
-                      style: TextStyle(
-                        fontSize: AppSizes.fontMD,
-                        fontWeight: FontWeight.w600,
-                        color: _cabin == c
-                            ? Colors.white
-                            : (isDark
-                            ? AppColors.darkTextPrimary
-                            : AppColors.lightTextPrimary),
-                      ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.airline_seat_recline_extra_rounded,
+                          color: _cabin == c
+                              ? Colors.white
+                              : AppColors.primaryStart,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          c,
+                          style: TextStyle(
+                            fontSize: AppSizes.fontMD,
+                            fontWeight: FontWeight.w600,
+                            color: _cabin == c
+                                ? Colors.white
+                                : (isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (_cabin == c)
+                          const Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 20),
+                      ],
                     ),
-                    const Spacer(),
-                    if (_cabin == c)
-                      const Icon(Icons.check_circle_rounded,
-                          color: Colors.white, size: 20),
-                  ],
-                ),
-              ),
-            )),
+                  ),
+                )),
           ],
         ),
       ),
     );
   }
 
-  String _monthName(int m) => const [
-    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ][m];
+  // String _monthName(int m) => const [
+  //       '',
+  //       'Jan',
+  //       'Feb',
+  //       'Mar',
+  //       'Apr',
+  //       'May',
+  //       'Jun',
+  //       'Jul',
+  //       'Aug',
+  //       'Sep',
+  //       'Oct',
+  //       'Nov',
+  //       'Dec'
+  //     ][m];
 }
 
 // ── Sub-widgets ────────────────────────────────────────────────────────────────
@@ -596,7 +708,7 @@ class _AirportField extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppColors.primaryStart.withValues(alpha:0.12),
+              color: AppColors.primaryStart.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: AppColors.primaryStart, size: 18),
@@ -677,8 +789,8 @@ class _DateCard extends StatelessWidget {
             Icon(icon,
                 color: disabled
                     ? (isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary)
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary)
                     : AppColors.primaryStart,
                 size: 18),
             const SizedBox(width: 10),
@@ -701,11 +813,11 @@ class _DateCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: disabled
                           ? (isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary)
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary)
                           : (isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary),
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -876,7 +988,7 @@ class _CounterButton extends StatelessWidget {
         height: 34,
         decoration: BoxDecoration(
           gradient: enabled ? AppColors.primaryGradient : null,
-          color: enabled ? null : Colors.grey.withValues(alpha:0.2),
+          color: enabled ? null : Colors.grey.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: Colors.white, size: 18),

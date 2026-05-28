@@ -4,20 +4,23 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 
 class FilterChipRow extends StatelessWidget {
+  final List<String> filters;
   final Set<String> activeFilters;
   final ValueChanged<String> onToggle;
+  final VoidCallback? onSort;
   final bool isDark;
 
   const FilterChipRow({
     super.key,
+    required this.filters,
     required this.activeFilters,
     required this.onToggle,
+    this.onSort,
     required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final filters = ['Direct', 'Refundable', 'Wi-Fi', 'Meal', 'Under \$500'];
     return SizedBox(
       height: 44,
       child: ListView.builder(

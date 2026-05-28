@@ -16,6 +16,7 @@ class CustomTextField extends StatefulWidget {
   final TextInputAction textInputAction;
   final FocusNode? focusNode;
   final VoidCallback? onEditingComplete;
+  final Function(String)? onSubmitted;
 
   const CustomTextField({
     super.key,
@@ -30,6 +31,7 @@ class CustomTextField extends StatefulWidget {
     this.textInputAction = TextInputAction.next,
     this.focusNode,
     this.onEditingComplete,
+    this.onSubmitted,
   });
 
   @override
