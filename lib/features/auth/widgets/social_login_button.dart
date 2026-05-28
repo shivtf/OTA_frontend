@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+import 'dart:math' as math;
 
 class SocialLoginButton extends StatelessWidget {
   final VoidCallback? onPressed;
@@ -59,9 +60,12 @@ class SocialLoginButton extends StatelessWidget {
 }
 
 class _GoogleIcon extends StatelessWidget {
+  const _GoogleIcon();
+
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
+      size: const Size(26, 26),
       painter: _GooglePainter(),
     );
   }
@@ -70,51 +74,73 @@ class _GoogleIcon extends StatelessWidget {
 class _GooglePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    final strokeWidth = size.width * 0.18;
 
-    final colors = [
-      const Color(0xFF4285F4),
-      const Color(0xFF34A853),
-      const Color(0xFFFBBC05),
-      const Color(0xFFEA4335),
-    ];
-
-    double startAngle = -90.0;
-    for (int i = 0; i < 4; i++) {
-      final paint = Paint()
-        ..color = colors[i]
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = size.width * 0.28;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius * 0.65),
-        startAngle * 3.14159265 / 180,
-        90.0 * 3.14159265 / 180,
-        false,
-        paint,
-      );
-      startAngle += 90.0;
-    }
-
-    canvas.drawCircle(
-      center,
-      radius * 0.4,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill,
+    final rect = Rect.fromCircle(
+      center: Offset(size.width / 2, size.height / 2),
+      radius: size.width * 0.34,
     );
 
+    Paint arcPaint(Color color) => Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt;
+
+    // RED
+    canvas.drawArc(
+      rect,
+      -45 * math.pi / 180,
+      90 * math.pi / 180,
+      false,
+      arcPaint(const Color(0xFFEA4335)),
+    );
+
+    // YELLOW
+    canvas.drawArc(
+      rect,
+      45 * math.pi / 180,
+      90 * math.pi / 180,
+      false,
+      arcPaint(const Color(0xFFFBBC05)),
+    );
+
+    // GREEN
+    canvas.drawArc(
+      rect,
+      135 * math.pi / 180,
+      90 * math.pi / 180,
+      false,
+      arcPaint(const Color(0xFF34A853)),
+    );
+
+    // BLUE
+    canvas.drawArc(
+      rect,
+      225 * math.pi / 180,
+      135 * math.pi / 180,
+      false,
+      arcPaint(const Color(0xFF4285F4)),
+    );
+
+    // Capital G horizontal line
+    final bluePaint = Paint()
+      ..color = const Color(0xFF4285F4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.square;
+
+    final centerY = size.height / 2;
+
+    // Start slightly INSIDE circle
+    // End BEFORE touching edge
     canvas.drawLine(
-      Offset(center.dx, center.dy),
-      Offset(center.dx + radius * 0.65, center.dy),
-      Paint()
-        ..color = const Color(0xFF4285F4)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = size.width * 0.25
-        ..strokeCap = StrokeCap.round,
+      Offset(size.width * 0.56, centerY),
+      Offset(size.width * 0.76, centerY),
+      bluePaint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
