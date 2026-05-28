@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/signup_screen.dart';
-import '../../features/auth/screens/registration_screen.dart';
+import '../../features/auth/screens/register_screen.dart';
 import '../../features/auth/screens/email_verified_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/flights/screens/flight_search_screen.dart';
