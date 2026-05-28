@@ -1,20 +1,23 @@
 // lib/main.dart
+//
+// Entry point for Wanderly travel app.
+// Initializes Stripe and launches the app.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'app.dart';
-import 'core/theme/theme_controller.dart';
+import 'features/payment/models/stripe_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait mode
+  // Lock to portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Make status bar transparent
+  // Transparent status bar
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -22,10 +25,10 @@ void main() async {
     ),
   );
 
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeController(),
-      child: const WanderlyApp(),
-    ),
-  );
+  // Initialize Stripe
+  // TODO: Replace with your actual Stripe publishable key from
+  // https://dashboard.stripe.com/test/apikeys
+  StripeService.init();
+
+  runApp(const WanderlyApp());
 }
