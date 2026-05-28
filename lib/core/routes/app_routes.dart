@@ -14,42 +14,48 @@ import '../../features/hotels/screens/hotel_details_screen.dart';
 import '../../features/cars/screens/car_search_screen.dart';
 import '../../features/cars/screens/car_results_screen.dart';
 import '../../features/cars/screens/car_details_screen.dart';
+import '../../features/payment/screens/payment_screen.dart';
+import '../../features/payment/screens/payment_success_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
 
-  static const String splash        = '/';
-  static const String login         = '/login';
-  static const String signup        = '/signup';
-  static const String registration  = '/registration';
-  static const String home          = '/home';
-  static const String flightSearch  = '/flights/search';
-  static const String flightResults = '/flights/results';
-  static const String flightDetails = '/flights/details';
-  static const String hotelSearch   = '/hotels/search';
-  static const String hotelResults  = '/hotels/results';
-  static const String hotelDetails  = '/hotels/details';
-  static const String carSearch     = '/cars/search';
-  static const String carResults    = '/cars/results';
-  static const String carDetails    = '/cars/details';
+  static const String splash          = '/';
+  static const String login           = '/login';
+  static const String signup          = '/signup';
+  static const String registration    = '/registration';
+  static const String home            = '/home';
+  static const String flightSearch    = '/flights/search';
+  static const String flightResults   = '/flights/results';
+  static const String flightDetails   = '/flights/details';
+  static const String hotelSearch     = '/hotels/search';
+  static const String hotelResults    = '/hotels/results';
+  static const String hotelDetails    = '/hotels/details';
+  static const String carSearch       = '/cars/search';
+  static const String carResults      = '/cars/results';
+  static const String carDetails      = '/cars/details';
+  static const String payment         = '/payment';
+  static const String paymentSuccess  = '/payment/success';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
-      case splash:        return _fade(const SplashScreen(), settings);
-      case login:         return _fade(const LoginScreen(), settings);
-      case signup:        return _fade(const SignupScreen(), settings);
-      case registration:  return _fade(const RegistrationScreen(), settings);
-      case home:          return _fade(const HomeScreen(), settings);
-      case flightSearch:  return _slide(const FlightSearchScreen(), settings);
-      case flightResults: return _slide(const FlightResultsScreen(), settings);
-      case flightDetails: return _slide(const FlightDetailsScreen(), settings);
-      case hotelSearch:   return _slide(const HotelSearchScreen(), settings);
-      case hotelResults:  return _slide(const HotelResultsScreen(), settings);
-      case hotelDetails:  return _slide(const HotelDetailsScreen(), settings);
-      case carSearch:     return _slide(const CarSearchScreen(), settings);
-      case carResults:    return _slide(const CarResultsScreen(), settings);
-      case carDetails:    return _slide(const CarDetailsScreen(), settings);
-      default:            return _fade(const SplashScreen(), settings);
+      case splash:         return _fade(const SplashScreen(), settings);
+      case login:          return _fade(const LoginScreen(), settings);
+      case signup:         return _fade(const SignupScreen(), settings);
+      case registration:   return _fade(const RegistrationScreen(), settings);
+      case home:           return _fade(const HomeScreen(), settings);
+      case flightSearch:   return _slide(const FlightSearchScreen(), settings);
+      case flightResults:  return _slide(const FlightResultsScreen(), settings);
+      case flightDetails:  return _slide(const FlightDetailsScreen(), settings);
+      case hotelSearch:    return _slide(const HotelSearchScreen(), settings);
+      case hotelResults:   return _slide(const HotelResultsScreen(), settings);
+      case hotelDetails:   return _slide(const HotelDetailsScreen(), settings);
+      case carSearch:      return _slide(const CarSearchScreen(), settings);
+      case carResults:     return _slide(const CarResultsScreen(), settings);
+      case carDetails:     return _slide(const CarDetailsScreen(), settings);
+      case payment:        return _slideUp(const PaymentScreen(), settings);
+      case paymentSuccess: return _fade(const PaymentSuccessScreen(), settings);
+      default:             return _fade(const SplashScreen(), settings);
     }
   }
 
@@ -77,6 +83,22 @@ class AppRoutes {
         return SlideTransition(position: slide, child: child);
       },
       transitionDuration: const Duration(milliseconds: 320),
+    );
+  }
+
+  // Payment slides up from bottom — feels like a checkout sheet
+  static PageRouteBuilder _slideUp(Widget page, RouteSettings settings) {
+    return PageRouteBuilder(
+      settings: settings,
+      pageBuilder: (_, __, ___) => page,
+      transitionsBuilder: (_, anim, __, child) {
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
+        return SlideTransition(position: slide, child: child);
+      },
+      transitionDuration: const Duration(milliseconds: 380),
     );
   }
 }

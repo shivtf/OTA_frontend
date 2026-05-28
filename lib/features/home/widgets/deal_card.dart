@@ -84,8 +84,8 @@ class DealCard extends StatelessWidget {
                               : AppColors.lightTextSecondary,
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      const Padding(
+                        padding:  EdgeInsets.symmetric(horizontal: 6),
                         child: Icon(
                           Icons.flight_rounded,
                           size: 13,
