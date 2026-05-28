@@ -9,7 +9,7 @@ class AppAssets {
   static const String travelBg = 'assets/images/travel_bg.png';
 
   // Icons
-  static const String googleIcon = 'assets/icons/google.png';
+  static const String googleIcon = 'assets/icons/';
   static const String appleIcon = 'assets/icons/apple.png';
   static const String airplaneIcon = 'assets/icons/airplane.png';
 }
