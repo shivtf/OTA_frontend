@@ -7,12 +7,13 @@ import 'package:app_links/app_links.dart';
 import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/network/api_client.dart';
 
 import 'features/auth/providers/auth_provider.dart';
 import 'features/flights/providers/flight_booking_provider.dart';
 
 class WanderlyApp extends StatefulWidget {
-  final AuthProvider authProvider; // ✅ received from main.dart
+  final AuthProvider authProvider;
   const WanderlyApp({super.key, required this.authProvider});
 
   @override
@@ -41,13 +42,43 @@ class _WanderlyAppState extends State<WanderlyApp> {
   }
 
   void _handleLink(Uri uri) {
-    if (uri.host == 'auth' && uri.path == '/verified') {
+    if (uri.host != 'auth') return;
+
+    if (uri.path == '/verified') {
+      // backward compat for any old links already sent
       final status = uri.queryParameters['status'] ?? 'error';
       final message = uri.queryParameters['message'] ?? 'Verification failed.';
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
             (route) => false,
         arguments: {'status': status, 'message': message},
+      );
+    } else if (uri.path == '/verify') {
+      // new flow: deep link from email → app calls API → shows result screen
+      final token = uri.queryParameters['token'] ?? '';
+      _verifyTokenAndNavigate(token);
+    }
+  }
+
+  Future<void> _verifyTokenAndNavigate(String token) async {
+    try {
+      await ApiClient.instance.post(
+        '/auth/verify-email-token',
+        {'token': token},
+      );
+      _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        AppRoutes.emailVerified,
+            (route) => false,
+        arguments: {'status': 'success'},
+      );
+    } catch (_) {
+      _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        AppRoutes.emailVerified,
+            (route) => false,
+        arguments: {
+          'status': 'error',
+          'message': 'Verification failed. The link may have expired.',
+        },
       );
     }
   }
@@ -63,8 +94,6 @@ class _WanderlyAppState extends State<WanderlyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeController()),
-        // ✅ Use .value so we reuse the already-loaded provider from main.dart
-        // ✅ Removed the duplicate AuthProvider()..tryAutoLogin() that was here
         ChangeNotifierProvider.value(value: widget.authProvider),
         ChangeNotifierProvider(create: (_) => FlightBookingProvider()),
       ],

@@ -138,8 +138,7 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen>
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map<String, dynamic>) {
       _isSuccess = (args['status'] as String?) == 'success';
-      _errorMessage =
-          args['message'] as String? ??
+      _errorMessage = args['message'] as String? ??
           'Verification failed. Please try again.';
     }
     if (_isSuccess && !_counting) {
@@ -319,11 +318,10 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen>
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color:
-                                          (_isSuccess
-                                                  ? AppColors.primaryEnd
-                                                  : AppColors.error)
-                                              .withOpacity(0.3),
+                                      color: (_isSuccess
+                                              ? AppColors.primaryEnd
+                                              : AppColors.error)
+                                          .withOpacity(0.3),
                                       width: 2,
                                     ),
                                   ),
@@ -337,11 +335,10 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen>
                                   height: 150,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color:
-                                        (_isSuccess
-                                                ? AppColors.primaryStart
-                                                : AppColors.error)
-                                            .withOpacity(0.1),
+                                    color: (_isSuccess
+                                            ? AppColors.primaryStart
+                                            : AppColors.error)
+                                        .withOpacity(0.1),
                                   ),
                                 ),
                               ),
@@ -370,11 +367,10 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen>
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color:
-                                              (_isSuccess
-                                                      ? AppColors.primaryStart
-                                                      : AppColors.error)
-                                                  .withOpacity(0.5),
+                                          color: (_isSuccess
+                                                  ? AppColors.primaryStart
+                                                  : AppColors.error)
+                                              .withOpacity(0.5),
                                           blurRadius: 30,
                                           spreadRadius: 5,
                                         ),
@@ -427,7 +423,6 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen>
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-
                                 if (_isSuccess) ...[
                                   const SizedBox(height: 24),
                                   // Verified badge chips
@@ -511,7 +506,6 @@ class _EmailVerifiedScreenState extends State<EmailVerifiedScreen>
                                     ),
                                   ),
                                 ),
-
                                 if (_isSuccess) ...[
                                   const SizedBox(height: 16),
                                   Text(

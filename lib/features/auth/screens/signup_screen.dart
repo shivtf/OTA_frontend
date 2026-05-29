@@ -14,23 +14,14 @@ import '../widgets/auth_header.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/social_login_button.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_client.dart';
+import 'package:country_picker/country_picker.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Country code → nationality map (ISO 3166-1 alpha-2).
 // Add / remove entries as your backend requires.
 // ─────────────────────────────────────────────────────────────────────────────
-const Map<String, String> _nationalityOptions = {
-  'IN': '🇮🇳  India',
-  'US': '🇺🇸  United States',
-  'GB': '🇬🇧  United Kingdom',
-  'AU': '🇦🇺  Australia',
-  'CA': '🇨🇦  Canada',
-  'SG': '🇸🇬  Singapore',
-  'AE': '🇦🇪  UAE',
-  'DE': '🇩🇪  Germany',
-  'FR': '🇫🇷  France',
-  'JP': '🇯🇵  Japan',
-};
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -53,7 +44,7 @@ class _SignupScreenState extends State<SignupScreen> {
   // ── NEW: fields required by /auth/register ────────────────────────────────
   final _dobController = TextEditingController(); // YYYY-MM-DD
   final _passportController = TextEditingController();
-  String _nationality = 'IN'; // default selection
+  Country _selectedCountry = CountryParser.parseCountryCode('US');
   // ─────────────────────────────────────────────────────────────────────────
 
   bool _agreedToTerms = false;
@@ -122,7 +113,7 @@ class _SignupScreenState extends State<SignupScreen> {
       phone: phone,
       // ── NEW fields ──────────────────────────────────
       dateOfBirth: _dobController.text.trim(),
-      nationality: _nationality,
+      nationality: _selectedCountry.countryCode,
       passportNumber: _passportController.text.trim().isEmpty
           ? null
           : _passportController.text.trim(),
@@ -136,8 +127,7 @@ class _SignupScreenState extends State<SignupScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-          Text(auth.error ?? 'Registration failed. Please try again.'),
+          content: Text(auth.error ?? 'Registration failed. Please try again.'),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -151,70 +141,116 @@ class _SignupScreenState extends State<SignupScreen> {
   // ── Verification dialog (shown immediately after successful register) ─────
   void _showVerificationDialog(String email) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    bool _resending = false;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.paddingXL),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryStart.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSizes.paddingXL),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                          color: AppColors.primaryStart.withValues(alpha: 0.4),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8))
+                    ],
+                  ),
+                  child: const Icon(Icons.mark_email_unread_rounded,
+                      color: Colors.white, size: 36),
                 ),
-                child: const Icon(
-                  Icons.mark_email_unread_rounded,
-                  color: Colors.white,
-                  size: 36,
+                const SizedBox(height: AppSizes.paddingLG),
+                Text('Check Your Email',
+                    style: Theme.of(ctx).textTheme.headlineMedium,
+                    textAlign: TextAlign.center),
+                const SizedBox(height: AppSizes.paddingSM),
+                Text(
+                  'We\'ve sent a verification link to\n$email\n\nOpen Gmail and tap the link — it will open directly in the app.',
+                  style: TextStyle(
+                      fontSize: AppSizes.fontMD,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                      height: 1.5),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: AppSizes.paddingLG),
-              Text(
-                'Verify Your Email',
-                style: Theme.of(ctx).textTheme.headlineMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSizes.paddingSM),
-              Text(
-                'We\'ve sent a verification link to\n$email\n\nPlease check your inbox and click the link to activate your account.',
-                style: TextStyle(
-                  fontSize: AppSizes.fontMD,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary,
-                  height: 1.5,
+                const SizedBox(height: AppSizes.paddingXL),
+
+                // ✅ Open Gmail button
+                GradientButton(
+                  text: 'Open Gmail',
+                  height: AppSizes.buttonHeightSM,
+                  onPressed: () async {
+                    final gmailUri = Uri.parse('googlegmail://');
+                    if (await canLaunchUrl(gmailUri)) {
+                      await launchUrl(gmailUri);
+                    } else {
+                      await launchUrl(Uri.parse('https://mail.google.com'),
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSizes.paddingXL),
-              GradientButton(
-                text: 'Go to Login',
-                height: AppSizes.buttonHeightSM,
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    AppRoutes.login,
-                        (_) => false,
-                  );
-                },
-              ),
-            ],
+                const SizedBox(height: AppSizes.paddingSM),
+
+                // ✅ Resend button
+                TextButton(
+                  onPressed: _resending
+                      ? null
+                      : () async {
+                          setDialogState(() => _resending = true);
+                          try {
+                            await ApiClient.instance.post(
+                                '/auth/resend-verification', {'email': email});
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('✅ Verification email resent!')),
+                              );
+                            }
+                          } catch (_) {
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Failed to resend. Please try again.')),
+                              );
+                            }
+                          }
+                          setDialogState(() => _resending = false);
+                        },
+                  child: _resending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Resend verification email'),
+                ),
+
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context)
+                        .pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+                  },
+                  child: const Text('Go to Login'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -231,7 +267,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     return Scaffold(
       backgroundColor:
-      isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: padding),
@@ -358,9 +394,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
                 // Nationality — NEW (dropdown)
                 _NationalityDropdown(
-                  value: _nationality,
+                  value: _selectedCountry,
                   isDark: isDark,
-                  onChanged: (v) => setState(() => _nationality = v!),
+                  onChanged: (country) =>
+                      setState(() => _selectedCountry = country),
                 ),
                 const SizedBox(height: AppSizes.paddingMD),
 
@@ -372,8 +409,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _passportController,
                   textInputAction: TextInputAction.next,
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'[A-Za-z0-9]')),
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
                     UpperCaseTextFormatter(),
                   ],
                   // no validator — field is optional
@@ -396,7 +432,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     if (v == null || v.isEmpty) return AppStrings.fieldRequired;
                     if (v.length < 8) return AppStrings.passwordTooShort;
                     if (!RegExp(
-                        r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#\$%^&*])')
+                            r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#\$%^&*])')
                         .hasMatch(v)) {
                       return 'Must contain upper, lower, number & symbol';
                     }
@@ -462,9 +498,9 @@ class _SignupScreenState extends State<SignupScreen> {
 // Nationality Dropdown
 // ─────────────────────────────────────────────────────────────────────────────
 class _NationalityDropdown extends StatelessWidget {
-  final String value;
+  final Country value;
   final bool isDark;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<Country> onChanged;
 
   const _NationalityDropdown({
     required this.value,
@@ -488,53 +524,97 @@ class _NationalityDropdown extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkCard : AppColors.lightInputBg,
-            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            border: Border.all(
-              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.flag_outlined,
-                size: 20,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: value,
-                    isExpanded: true,
-                    dropdownColor:
-                    isDark ? AppColors.darkCard : Colors.white,
-                    items: _nationalityOptions.entries
-                        .map(
-                          (e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Text(
-                          e.value,
-                          style: TextStyle(
-                            fontSize: AppSizes.fontMD,
-                            color: isDark
-                                ? AppColors.darkTextPrimary
-                                : AppColors.lightTextPrimary,
-                          ),
-                        ),
-                      ),
-                    )
-                        .toList(),
-                    onChanged: onChanged,
+        GestureDetector(
+          onTap: () {
+            showCountryPicker(
+              context: context,
+              showPhoneCode: false,
+              countryListTheme: CountryListThemeData(
+                backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+                textStyle: TextStyle(
+                  color: isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightTextPrimary,
+                  fontSize: AppSizes.fontMD,
+                ),
+                searchTextStyle: TextStyle(
+                  color: isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightTextPrimary,
+                ),
+                inputDecoration: InputDecoration(
+                  hintText: 'Search country...',
+                  hintStyle: TextStyle(
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                  prefixIcon: Icon(Icons.search,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary),
+                  filled: true,
+                  fillColor: isDark
+                      ? AppColors.darkBackground
+                      : AppColors.lightInputBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                    borderSide: BorderSide(
+                      color:
+                          isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                    ),
                   ),
                 ),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
-            ],
+              onSelect: onChanged,
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightInputBg,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+              border: Border.all(
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.flag_outlined,
+                  size: 20,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  value.flagEmoji,
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    value.name,
+                    style: TextStyle(
+                      fontSize: AppSizes.fontMD,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -568,9 +648,8 @@ class _SectionLabel extends StatelessWidget {
           style: TextStyle(
             fontSize: AppSizes.fontMD,
             fontWeight: FontWeight.w700,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
+            color:
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
           ),
         ),
       ],
@@ -661,8 +740,7 @@ class _ThemeToggle extends StatelessWidget {
           border: Border.all(
               color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         ),
-        child: Icon(
-            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+        child: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             size: 18,
             color: isDark
                 ? AppColors.darkTextSecondary
