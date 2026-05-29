@@ -85,7 +85,7 @@ class _HomeTab extends StatelessWidget {
         SliverToBoxAdapter(child: _HomeHeader(isDark: isDark, tc: tc)),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: HomeSearchBar(isDark: isDark),
           ),
         ),
@@ -598,9 +598,9 @@ class _ProfileMenuSheet extends StatelessWidget {
                   pageBuilder: (_, __, ___) => const ChangePasswordScreen(),
                   transitionsBuilder: (_, anim, __, child) => SlideTransition(
                     position: Tween<Offset>(
-                            begin: const Offset(1, 0), end: Offset.zero)
+                        begin: const Offset(1, 0), end: Offset.zero)
                         .animate(CurvedAnimation(
-                            parent: anim, curve: Curves.easeOutCubic)),
+                        parent: anim, curve: Curves.easeOutCubic)),
                     child: child,
                   ),
                   transitionDuration: const Duration(milliseconds: 320),
@@ -716,7 +716,7 @@ class _ProfileMenuSheet extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () async {
                       final rootNav =
-                          Navigator.of(sheetCtx, rootNavigator: true);
+                      Navigator.of(sheetCtx, rootNavigator: true);
                       await sheetCtx.read<AuthProvider>().logout();
                       rootNav.pushNamedAndRemoveUntil(
                           AppRoutes.login, (_) => false);
