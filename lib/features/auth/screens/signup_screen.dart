@@ -15,6 +15,23 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/social_login_button.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Country code → nationality map (ISO 3166-1 alpha-2).
+// Add / remove entries as your backend requires.
+// ─────────────────────────────────────────────────────────────────────────────
+const Map<String, String> _nationalityOptions = {
+  'IN': '🇮🇳  India',
+  'US': '🇺🇸  United States',
+  'GB': '🇬🇧  United Kingdom',
+  'AU': '🇦🇺  Australia',
+  'CA': '🇨🇦  Canada',
+  'SG': '🇸🇬  Singapore',
+  'AE': '🇦🇪  UAE',
+  'DE': '🇩🇪  Germany',
+  'FR': '🇫🇷  France',
+  'JP': '🇯🇵  Japan',
+};
+
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -24,12 +41,20 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+
+  // Existing controllers
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  // ── NEW: fields required by /auth/register ────────────────────────────────
+  final _dobController = TextEditingController(); // YYYY-MM-DD
+  final _passportController = TextEditingController();
+  String _nationality = 'IN'; // default selection
+  // ─────────────────────────────────────────────────────────────────────────
 
   bool _agreedToTerms = false;
 
@@ -41,9 +66,29 @@ class _SignupScreenState extends State<SignupScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _dobController.dispose();
+    _passportController.dispose();
     super.dispose();
   }
 
+  // ── Date-picker helper ────────────────────────────────────────────────────
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(now.year - 1, now.month, now.day),
+      helpText: 'Select Date of Birth',
+    );
+    if (picked != null) {
+      final formatted =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      _dobController.text = formatted;
+    }
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   Future<void> _onSignup() async {
     if (_formKey.currentState?.validate() != true) return;
     if (!_agreedToTerms) {
@@ -63,7 +108,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final auth = context.read<AuthProvider>();
     auth.clearError();
 
-    // Format phone: add +91 if not already international
+    // Format phone: add +91 prefix for bare Indian numbers
     String phone = _phoneController.text.trim();
     if (phone.isNotEmpty && !phone.startsWith('+')) {
       phone = '+91$phone';
@@ -75,6 +120,13 @@ class _SignupScreenState extends State<SignupScreen> {
       email: _emailController.text.trim(),
       password: _passwordController.text,
       phone: phone,
+      // ── NEW fields ──────────────────────────────────
+      dateOfBirth: _dobController.text.trim(),
+      nationality: _nationality,
+      passportNumber: _passportController.text.trim().isEmpty
+          ? null
+          : _passportController.text.trim(),
+      // ────────────────────────────────────────────────
     );
 
     if (!mounted) return;
@@ -84,7 +136,8 @@ class _SignupScreenState extends State<SignupScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(auth.error ?? 'Registration failed. Please try again.'),
+          content:
+          Text(auth.error ?? 'Registration failed. Please try again.'),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -95,6 +148,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  // ── Verification dialog (shown immediately after successful register) ─────
   void _showVerificationDialog(String email) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
@@ -156,7 +210,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   Navigator.of(ctx).pop();
                   Navigator.of(context).pushNamedAndRemoveUntil(
                     AppRoutes.login,
-                    (_) => false,
+                        (_) => false,
                   );
                 },
               ),
@@ -167,6 +221,7 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -176,7 +231,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: padding),
@@ -201,6 +256,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSizes.paddingXL),
+
+                // ── Section: Personal Info ──────────────────────────────
+                _SectionLabel(label: 'Personal Information', isDark: isDark),
+                const SizedBox(height: AppSizes.paddingMD),
 
                 // First Name
                 CustomTextField(
@@ -231,6 +290,29 @@ class _SignupScreenState extends State<SignupScreen> {
                       return AppStrings.fieldRequired;
                     return null;
                   },
+                ),
+                const SizedBox(height: AppSizes.paddingMD),
+
+                // Date of Birth — NEW
+                GestureDetector(
+                  onTap: _pickDob,
+                  child: AbsorbPointer(
+                    child: CustomTextField(
+                      label: 'Date of Birth',
+                      hint: 'YYYY-MM-DD',
+                      prefixIcon: Icons.cake_outlined,
+                      controller: _dobController,
+                      keyboardType: TextInputType.datetime,
+                      textInputAction: TextInputAction.next,
+                      validator: (v) {
+                        if (v == null || v.isEmpty)
+                          return AppStrings.fieldRequired;
+                        if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(v))
+                          return 'Use format YYYY-MM-DD';
+                        return null;
+                      },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: AppSizes.paddingMD),
 
@@ -268,6 +350,38 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: AppSizes.paddingXL),
+
+                // ── Section: Travel Documents ───────────────────────────
+                _SectionLabel(label: 'Travel Details', isDark: isDark),
+                const SizedBox(height: AppSizes.paddingMD),
+
+                // Nationality — NEW (dropdown)
+                _NationalityDropdown(
+                  value: _nationality,
+                  isDark: isDark,
+                  onChanged: (v) => setState(() => _nationality = v!),
+                ),
+                const SizedBox(height: AppSizes.paddingMD),
+
+                // Passport Number — NEW (optional)
+                CustomTextField(
+                  label: 'Passport Number (Optional)',
+                  hint: 'P2630567',
+                  prefixIcon: Icons.badge_outlined,
+                  controller: _passportController,
+                  textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                        RegExp(r'[A-Za-z0-9]')),
+                    UpperCaseTextFormatter(),
+                  ],
+                  // no validator — field is optional
+                ),
+                const SizedBox(height: AppSizes.paddingXL),
+
+                // ── Section: Security ───────────────────────────────────
+                _SectionLabel(label: 'Security', isDark: isDark),
                 const SizedBox(height: AppSizes.paddingMD),
 
                 // Password
@@ -281,6 +395,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   validator: (v) {
                     if (v == null || v.isEmpty) return AppStrings.fieldRequired;
                     if (v.length < 8) return AppStrings.passwordTooShort;
+                    if (!RegExp(
+                        r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#\$%^&*])')
+                        .hasMatch(v)) {
+                      return 'Must contain upper, lower, number & symbol';
+                    }
                     return null;
                   },
                 ),
@@ -339,6 +458,140 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Nationality Dropdown
+// ─────────────────────────────────────────────────────────────────────────────
+class _NationalityDropdown extends StatelessWidget {
+  final String value;
+  final bool isDark;
+  final ValueChanged<String?> onChanged;
+
+  const _NationalityDropdown({
+    required this.value,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Nationality',
+          style: TextStyle(
+            fontSize: AppSizes.fontSM,
+            fontWeight: FontWeight.w600,
+            color: isDark
+                ? AppColors.darkTextSecondary
+                : AppColors.lightTextSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : AppColors.lightInputBg,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.flag_outlined,
+                size: 20,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: value,
+                    isExpanded: true,
+                    dropdownColor:
+                    isDark ? AppColors.darkCard : Colors.white,
+                    items: _nationalityOptions.entries
+                        .map(
+                          (e) => DropdownMenuItem(
+                        value: e.key,
+                        child: Text(
+                          e.value,
+                          style: TextStyle(
+                            fontSize: AppSizes.fontMD,
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary,
+                          ),
+                        ),
+                      ),
+                    )
+                        .toList(),
+                    onChanged: onChanged,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section label (matches register_screen.dart style)
+// ─────────────────────────────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final bool isDark;
+  const _SectionLabel({required this.label, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: AppSizes.fontMD,
+            fontWeight: FontWeight.w700,
+            color: isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Input formatter: force uppercase (passport numbers)
+// ─────────────────────────────────────────────────────────────────────────────
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(text: newValue.text.toUpperCase());
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared private widgets (unchanged from original)
+// ─────────────────────────────────────────────────────────────────────────────
 class _TermsCheckbox extends StatelessWidget {
   final bool value;
   final ValueChanged<bool?> onChanged;
@@ -374,11 +627,13 @@ class _TermsCheckbox extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: () {},
-                child: const Text(AppStrings.termsConditions,
-                    style: TextStyle(
-                        fontSize: AppSizes.fontSM,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryStart)),
+                child: const Text(
+                  AppStrings.termsConditions,
+                  style: TextStyle(
+                      fontSize: AppSizes.fontSM,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryStart),
+                ),
               ),
             ],
           ),
@@ -406,7 +661,8 @@ class _ThemeToggle extends StatelessWidget {
           border: Border.all(
               color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         ),
-        child: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+        child: Icon(
+            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             size: 18,
             color: isDark
                 ? AppColors.darkTextSecondary
@@ -437,11 +693,13 @@ class _BottomAuthLink extends StatelessWidget {
                     : AppColors.lightTextSecondary)),
         GestureDetector(
           onTap: onTap,
-          child: const Text('Login',
-              style: TextStyle(
-                  fontSize: AppSizes.fontSM,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryStart)),
+          child: const Text(
+            'Login',
+            style: TextStyle(
+                fontSize: AppSizes.fontSM,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primaryStart),
+          ),
         ),
       ],
     );
