@@ -125,6 +125,33 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // ── Change password (authenticated) ────────────────────────────
+  // Returns true on success. On success the backend revokes all other
+  // refresh tokens, so the user stays logged in on this device only.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    _setLoading(true);
+    try {
+      await _service.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        confirmNewPassword: confirmNewPassword,
+      );
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // ── Forgot password ─────────────────────────────────────────────
   Future<bool> forgotPassword(String email) async {
     _setLoading(true);

@@ -15,6 +15,7 @@ import '../../profiles/screens/profile_screen.dart';
 import '../../profiles/screens/my_bookings_screen.dart';
 import '../../profiles/screens/update_profile_screen.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/screens/change_password_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -589,15 +590,17 @@ class _ProfileMenuSheet extends StatelessWidget {
             isDark: isDark,
             onTap: () {
               Navigator.of(context).pop();
-              // Placeholder – dedicated screen to be implemented
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Change Password coming soon!'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: AppColors.primaryStart,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  margin: const EdgeInsets.all(16),
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const ChangePasswordScreen(),
+                  transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                    position: Tween<Offset>(
+                            begin: const Offset(1, 0), end: Offset.zero)
+                        .animate(CurvedAnimation(
+                            parent: anim, curve: Curves.easeOutCubic)),
+                    child: child,
+                  ),
+                  transitionDuration: const Duration(milliseconds: 320),
                 ),
               );
             },
@@ -634,7 +637,7 @@ class _ProfileMenuSheet extends StatelessWidget {
       backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (_) => Padding(
+      builder: (sheetCtx) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -709,12 +712,11 @@ class _ProfileMenuSheet extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      Navigator.pop(context);
-                      await context.read<AuthProvider>().logout();
-                      if (context.mounted) {
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                            AppRoutes.login, (_) => false);
-                      }
+                      final rootNav =
+                          Navigator.of(sheetCtx, rootNavigator: true);
+                      await sheetCtx.read<AuthProvider>().logout();
+                      rootNav.pushNamedAndRemoveUntil(
+                          AppRoutes.login, (_) => false);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.error,

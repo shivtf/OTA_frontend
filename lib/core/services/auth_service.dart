@@ -40,7 +40,9 @@ class AuthService {
     final refresh = await _client.getRefreshToken();
     if (refresh == null) throw ApiException('No refresh token', 401);
     final res = await _client.post('/auth/refresh', {'refreshToken': refresh});
-    final access = res['data']['accessToken'] as String;
+    // Backend refresh returns 'token', not 'accessToken'
+    final access =
+        res['data']['token'] as String? ?? res['data']['accessToken'] as String;
     final newRefresh = res['data']['refreshToken'] as String? ?? refresh;
     await _client.saveTokens(access, newRefresh);
     return access;
@@ -74,6 +76,25 @@ class AuthService {
       'token': token,
       'newPassword': newPassword,
     });
+  }
+
+  // ── POST /auth/change-password ──────────────────────────────────
+  // Authenticated endpoint: verifies currentPassword on the backend
+  // before updating. All other sessions are invalidated on success.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    await _client.post(
+      '/auth/change-password',
+      {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+        'confirmNewPassword': confirmNewPassword,
+      },
+      auth: true,
+    );
   }
 
   // ── Token helpers ───────────────────────────────────────────────
@@ -110,7 +131,8 @@ class AuthResult {
   });
 
   factory AuthResult.fromJson(Map<String, dynamic> j) => AuthResult(
-        accessToken: j['accessToken'] as String? ?? '',
+        // Backend login/register returns 'token', not 'accessToken'
+        accessToken: j['token'] as String? ?? j['accessToken'] as String? ?? '',
         refreshToken: j['refreshToken'] as String? ?? '',
         user: UserProfile.fromJson(j['user'] as Map<String, dynamic>? ?? j),
       );
