@@ -54,20 +54,20 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       '${_returnDateTime.year}-${_returnDateTime.month.toString().padLeft(2, '0')}-${_returnDateTime.day.toString().padLeft(2, '0')}';
 
   String _monthName(int m) => const [
-    '',
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec'
-  ][m];
+        '',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ][m];
 
   String get _departDisplay =>
       '${_departDateTime.day} ${_monthName(_departDateTime.month)}, ${_departDateTime.year}';
@@ -99,7 +99,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
     setState(() {
       _recentSearches = raw
           .map((e) => Map<String, String>.from(
-          (jsonDecode(e) as Map).cast<String, String>()))
+              (jsonDecode(e) as Map).cast<String, String>()))
           .toList();
     });
   }
@@ -119,8 +119,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       'date': date,
     };
     // Remove duplicate if same route already exists, then insert at front
-    _recentSearches
-        .removeWhere((r) => r['from'] == from && r['to'] == to);
+    _recentSearches.removeWhere((r) => r['from'] == from && r['to'] == to);
     _recentSearches.insert(0, entry);
     // Keep only the 5 most recent
     if (_recentSearches.length > 5) {
@@ -253,7 +252,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
 
     return Scaffold(
       backgroundColor:
-      isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(context, isDark, tc)),
@@ -293,15 +292,15 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        )
+                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
             : const LinearGradient(
-          colors: [Color(0xFF6C3CE1), Color(0xFF9B5CFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+                colors: [Color(0xFF6C3CE1), Color(0xFF9B5CFF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
@@ -379,8 +378,8 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                       color: isActive
                           ? Colors.white
                           : (isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary),
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary),
                     ),
                   ),
                 ),
@@ -402,12 +401,12 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         boxShadow: isDark
             ? null
             : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -538,28 +537,28 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
             fontSize: AppSizes.fontLG,
             fontWeight: FontWeight.w700,
             color:
-            isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
           ),
         ),
         const SizedBox(height: 14),
         ..._recentSearches.map((r) => _RecentSearchTile(
-          from: r['from']!,
-          to: r['to']!,
-          date: r['date']!,
-          isDark: isDark,
-          onTap: () {
-            setState(() {
-              _fromCode = r['from']!;
-              _toCode = r['to']!;
-              _fromCity = r['fromCity'] ?? r['from']!;
-              _toCity = r['toCity'] ?? r['to']!;
-              _fromDisplayController.text =
-              '${r['from']} · ${r['fromCity'] ?? r['from']}';
-              _toDisplayController.text =
-              '${r['to']} · ${r['toCity'] ?? r['to']}';
-            });
-          },
-        )),
+              from: r['from']!,
+              to: r['to']!,
+              date: r['date']!,
+              isDark: isDark,
+              onTap: () {
+                setState(() {
+                  _fromCode = r['from']!;
+                  _toCode = r['to']!;
+                  _fromCity = r['fromCity'] ?? r['from']!;
+                  _toCity = r['toCity'] ?? r['to']!;
+                  _fromDisplayController.text =
+                      '${r['from']} · ${r['fromCity'] ?? r['from']}';
+                  _toDisplayController.text =
+                      '${r['to']} · ${r['toCity'] ?? r['to']}';
+                });
+              },
+            )),
       ],
     );
   }
@@ -667,20 +666,20 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                 )),
             const SizedBox(height: 16),
             ..._cabins.map((c) => ListTile(
-              title: Text(c,
-                  style: TextStyle(
-                      color: isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary)),
-              trailing: _cabin == c
-                  ? Icon(Icons.check_circle_rounded,
-                  color: AppColors.primaryStart)
-                  : null,
-              onTap: () {
-                setState(() => _cabin = c);
-                Navigator.pop(context);
-              },
-            )),
+                  title: Text(c,
+                      style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary)),
+                  trailing: _cabin == c
+                      ? Icon(Icons.check_circle_rounded,
+                          color: AppColors.primaryStart)
+                      : null,
+                  onTap: () {
+                    setState(() => _cabin = c);
+                    Navigator.pop(context);
+                  },
+                )),
             const SizedBox(height: 8),
           ],
         ),
@@ -742,10 +741,24 @@ class _AirportTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   // Big IATA code
+
+                  if (displayText.isNotEmpty)
+                    Text(
+                      displayText.contains('·')
+                          ? displayText.split('·').last.trim()
+                          : displayText,
+                      style: TextStyle(
+                        fontSize: AppSizes.fontXL,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   Text(
                     iataCode,
                     style: TextStyle(
-                      fontSize: AppSizes.fontXXL,
+                      fontSize: AppSizes.fontSM,
                       fontWeight: FontWeight.w800,
                       color: isDark
                           ? AppColors.darkTextPrimary
@@ -754,19 +767,6 @@ class _AirportTile extends StatelessWidget {
                     ),
                   ),
                   // City / airport name below
-                  if (displayText.isNotEmpty)
-                    Text(
-                      displayText.contains('·')
-                          ? displayText.split('·').last.trim()
-                          : displayText,
-                      style: TextStyle(
-                        fontSize: AppSizes.fontXS,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
                 ],
               ),
             ),
@@ -900,7 +900,7 @@ class _PlacePickerSheetState extends State<_PlacePickerSheet> {
               child: Container(
                 decoration: BoxDecoration(
                   color:
-                  isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
+                      isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: borderColor),
                 ),
@@ -931,7 +931,7 @@ class _PlacePickerSheetState extends State<_PlacePickerSheet> {
                           border: InputBorder.none,
                           isDense: true,
                           contentPadding:
-                          const EdgeInsets.symmetric(vertical: 14),
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
@@ -1037,7 +1037,7 @@ class _PlacePickerSheetState extends State<_PlacePickerSheet> {
         final isCity = place.type == 'city';
         return ListTile(
           contentPadding:
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           leading: Container(
             width: 40,
             height: 40,
@@ -1133,8 +1133,8 @@ class _DateCard extends StatelessWidget {
             Icon(icon,
                 color: disabled
                     ? (isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary)
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary)
                     : AppColors.primaryStart,
                 size: 18),
             const SizedBox(width: 10),
@@ -1157,11 +1157,11 @@ class _DateCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: disabled
                           ? (isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary)
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary)
                           : (isDark
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary),
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

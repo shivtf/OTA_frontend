@@ -12,7 +12,8 @@ import 'features/auth/providers/auth_provider.dart';
 import 'features/flights/providers/flight_booking_provider.dart';
 
 class WanderlyApp extends StatefulWidget {
-  const WanderlyApp({super.key});
+  final AuthProvider authProvider; // ✅ received from main.dart
+  const WanderlyApp({super.key, required this.authProvider});
 
   @override
   State<WanderlyApp> createState() => _WanderlyAppState();
@@ -21,7 +22,7 @@ class WanderlyApp extends StatefulWidget {
 class _WanderlyAppState extends State<WanderlyApp> {
   StreamSubscription? _linkSubscription;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  final _appLinks = AppLinks(); // ← replaces uni_links
+  final _appLinks = AppLinks();
 
   @override
   void initState() {
@@ -30,13 +31,9 @@ class _WanderlyAppState extends State<WanderlyApp> {
   }
 
   Future<void> _initDeepLinks() async {
-    // Cold start — app opened via deep link
     final initialUri = await _appLinks.getInitialLink();
-    if (initialUri != null) {
-      _handleLink(initialUri);
-    }
+    if (initialUri != null) _handleLink(initialUri);
 
-    // Warm start — link received while app is running
     _linkSubscription = _appLinks.uriLinkStream.listen(
       _handleLink,
       onError: (_) {},
@@ -44,14 +41,12 @@ class _WanderlyAppState extends State<WanderlyApp> {
   }
 
   void _handleLink(Uri uri) {
-    // otaapp://auth/verified?status=success
-    // otaapp://auth/verified?status=error&message=...
     if (uri.host == 'auth' && uri.path == '/verified') {
       final status = uri.queryParameters['status'] ?? 'error';
       final message = uri.queryParameters['message'] ?? 'Verification failed.';
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
-        (route) => false,
+            (route) => false,
         arguments: {'status': status, 'message': message},
       );
     }
@@ -68,12 +63,10 @@ class _WanderlyAppState extends State<WanderlyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeController()),
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider()..tryAutoLogin(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => FlightBookingProvider(),
-        ),
+        // ✅ Use .value so we reuse the already-loaded provider from main.dart
+        // ✅ Removed the duplicate AuthProvider()..tryAutoLogin() that was here
+        ChangeNotifierProvider.value(value: widget.authProvider),
+        ChangeNotifierProvider(create: (_) => FlightBookingProvider()),
       ],
       child: Consumer<ThemeController>(
         builder: (context, themeController, child) {

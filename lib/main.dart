@@ -1,23 +1,18 @@
 // lib/main.dart
-//
-// Entry point for Wanderly travel app.
-// Initializes Stripe and launches the app.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app.dart';
+import 'features/auth/providers/auth_provider.dart';
 import 'features/payment/models/stripe_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Transparent status bar
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -25,10 +20,11 @@ void main() async {
     ),
   );
 
-  // Initialize Stripe
-  // TODO: Replace with your actual Stripe publishable key from
-  // https://dashboard.stripe.com/test/apikeys
   StripeService.init();
 
-  runApp(const WanderlyApp());
+  // ✅ Await auto-login BEFORE runApp so isLoggedIn is ready immediately
+  final authProvider = AuthProvider();
+  await authProvider.tryAutoLogin();
+
+  runApp(WanderlyApp(authProvider: authProvider)); // ✅ pass it in
 }
