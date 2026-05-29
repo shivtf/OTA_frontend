@@ -12,7 +12,6 @@ class FlightService {
     String? returnDate,
     int adults = 1,
     int children = 0,
-    int infants = 0,
     String cabinClass = 'economy',
     int? maxConnections,
     double? maxPrice,
@@ -21,11 +20,10 @@ class FlightService {
     final body = <String, dynamic>{
       'origin': origin.toUpperCase(),
       'destination': destination.toUpperCase(),
-      'departureDate': departureDate, // YYYY-MM-DD
+      'departureDate': departureDate,
       'adults': adults,
       'children': children,
-      'infants': infants,
-      'cabinClass': cabinClass, // economy | business | first
+      'cabinClass': cabinClass,
     };
     if (returnDate != null) body['returnDate'] = returnDate;
     if (maxConnections != null) body['maxConnections'] = maxConnections;
@@ -97,7 +95,7 @@ class FlightService {
       if (status != null) 'status': status,
     };
     final res =
-        await _client.get('/flights/bookings', query: query, auth: true);
+    await _client.get('/flights/bookings', query: query, auth: true);
     final list = res['data'] as List<dynamic>? ?? [];
     return list
         .map((e) => FlightBookingListItem.fromJson(e as Map<String, dynamic>))
@@ -183,7 +181,7 @@ class FlightOffer {
     return FlightOffer(
       offerId: j['offerId'] as String? ?? j['id'] as String? ?? '',
       pricing:
-          OfferPricing.fromJson(j['pricing'] as Map<String, dynamic>? ?? {}),
+      OfferPricing.fromJson(j['pricing'] as Map<String, dynamic>? ?? {}),
       conditions: j['conditions'] != null
           ? OfferConditions.fromJson(j['conditions'] as Map<String, dynamic>)
           : null,
@@ -212,11 +210,11 @@ class OfferPricing {
   });
 
   factory OfferPricing.fromJson(Map<String, dynamic> j) => OfferPricing(
-        baseAmount: double.tryParse(j['baseAmount']?.toString() ?? '0') ?? 0,
-        taxAmount: double.tryParse(j['taxAmount']?.toString() ?? '0') ?? 0,
-        totalAmount: double.tryParse(j['totalAmount']?.toString() ?? '0') ?? 0,
-        totalCurrency: j['totalCurrency'] as String? ?? 'USD',
-      );
+    baseAmount: double.tryParse(j['baseAmount']?.toString() ?? '0') ?? 0,
+    taxAmount: double.tryParse(j['taxAmount']?.toString() ?? '0') ?? 0,
+    totalAmount: double.tryParse(j['totalAmount']?.toString() ?? '0') ?? 0,
+    totalCurrency: j['totalCurrency'] as String? ?? 'USD',
+  );
 }
 
 class OfferConditions {
@@ -233,11 +231,11 @@ class OfferConditions {
   });
 
   factory OfferConditions.fromJson(Map<String, dynamic> j) => OfferConditions(
-        refundable: j['refundable'] as bool? ?? false,
-        changeable: j['changeable'] as bool? ?? false,
-        refundPenaltyAmount: j['refundPenaltyAmount'] as String?,
-        changePenaltyAmount: j['changePenaltyAmount'] as String?,
-      );
+    refundable: j['refundable'] as bool? ?? false,
+    changeable: j['changeable'] as bool? ?? false,
+    refundPenaltyAmount: j['refundPenaltyAmount'] as String?,
+    changePenaltyAmount: j['changePenaltyAmount'] as String?,
+  );
 }
 
 class AirlineInfo {
@@ -256,12 +254,12 @@ class AirlineInfo {
   });
 
   factory AirlineInfo.fromJson(Map<String, dynamic> j) => AirlineInfo(
-        id: j['id'] as String? ?? '',
-        iataCode: j['iataCode'] as String? ?? '',
-        name: j['name'] as String? ?? '',
-        logoUrl: j['logoUrl'] as String?,
-        logoLockupUrl: j['logoLockupUrl'] as String?,
-      );
+    id: j['id'] as String? ?? '',
+    iataCode: j['iataCode'] as String? ?? '',
+    name: j['name'] as String? ?? '',
+    logoUrl: j['logoUrl'] as String?,
+    logoLockupUrl: j['logoLockupUrl'] as String?,
+  );
 }
 
 class FlightSlice {
@@ -289,7 +287,7 @@ class FlightSlice {
       sliceId: j['sliceId'] as String? ?? '',
       origin: AirportInfo.fromJson(j['origin'] as Map<String, dynamic>? ?? {}),
       destination:
-          AirportInfo.fromJson(j['destination'] as Map<String, dynamic>? ?? {}),
+      AirportInfo.fromJson(j['destination'] as Map<String, dynamic>? ?? {}),
       departureAt: j['departureAt'] as String? ?? '',
       arrivalAt: j['arrivalAt'] as String? ?? '',
       duration: j['duration'] as String? ?? '',
@@ -318,13 +316,13 @@ class AirportInfo {
   });
 
   factory AirportInfo.fromJson(Map<String, dynamic> j) => AirportInfo(
-        iataCode: j['iataCode'] as String? ?? '',
-        name: j['name'] as String? ?? '',
-        cityName: j['cityName'] as String? ?? '',
-        cityIataCode: j['cityIataCode'] as String?,
-        countryCode: j['countryCode'] as String?,
-        timeZone: j['timeZone'] as String?,
-      );
+    iataCode: j['iataCode'] as String? ?? '',
+    name: j['name'] as String? ?? '',
+    cityName: j['cityName'] as String? ?? '',
+    cityIataCode: j['cityIataCode'] as String?,
+    countryCode: j['countryCode'] as String?,
+    timeZone: j['timeZone'] as String?,
+  );
 }
 
 class FlightSegment {
@@ -353,22 +351,22 @@ class FlightSegment {
   });
 
   factory FlightSegment.fromJson(Map<String, dynamic> j) => FlightSegment(
-        id: j['id'] as String? ?? '',
-        origin:
-            AirportInfo.fromJson(j['origin'] as Map<String, dynamic>? ?? {}),
-        destination: AirportInfo.fromJson(
-            j['destination'] as Map<String, dynamic>? ?? {}),
-        departingAt: j['departingAt'] as String? ?? '',
-        arrivingAt: j['arrivingAt'] as String? ?? '',
-        duration: j['duration'] as String? ?? '',
-        marketingCarrier: j['marketingCarrier'] != null
-            ? MarketingCarrier.fromJson(
-                j['marketingCarrier'] as Map<String, dynamic>)
-            : null,
-        flightNumber: j['marketingCarrierFlightNumber'] as String?,
-        originTerminal: j['originTerminal'] as String?,
-        destinationTerminal: j['destinationTerminal'] as String?,
-      );
+    id: j['id'] as String? ?? '',
+    origin:
+    AirportInfo.fromJson(j['origin'] as Map<String, dynamic>? ?? {}),
+    destination: AirportInfo.fromJson(
+        j['destination'] as Map<String, dynamic>? ?? {}),
+    departingAt: j['departingAt'] as String? ?? '',
+    arrivingAt: j['arrivingAt'] as String? ?? '',
+    duration: j['duration'] as String? ?? '',
+    marketingCarrier: j['marketingCarrier'] != null
+        ? MarketingCarrier.fromJson(
+        j['marketingCarrier'] as Map<String, dynamic>)
+        : null,
+    flightNumber: j['marketingCarrierFlightNumber'] as String?,
+    originTerminal: j['originTerminal'] as String?,
+    destinationTerminal: j['destinationTerminal'] as String?,
+  );
 }
 
 class MarketingCarrier {
@@ -383,10 +381,10 @@ class MarketingCarrier {
   });
 
   factory MarketingCarrier.fromJson(Map<String, dynamic> j) => MarketingCarrier(
-        iataCode: j['iataCode'] as String? ?? '',
-        name: j['name'] as String? ?? '',
-        logoUrl: j['logoUrl'] as String?,
-      );
+    iataCode: j['iataCode'] as String? ?? '',
+    name: j['name'] as String? ?? '',
+    logoUrl: j['logoUrl'] as String?,
+  );
 }
 
 /// Returned by POST /flights/book
@@ -413,19 +411,19 @@ class FlightBooking {
   });
 
   factory FlightBooking.fromJson(Map<String, dynamic> j) => FlightBooking(
-        bookingId: j['bookingId'] as String? ?? j['id'] as String? ?? '',
-        bookingRef: j['bookingRef'] as String? ?? '',
-        pricing: j['pricing'] != null
-            ? OfferPricing.fromJson(j['pricing'] as Map<String, dynamic>)
-            : OfferPricing.fromJson({}),
-        amount: double.tryParse(j['amount']?.toString() ?? '0') ?? 0,
-        currency: j['currency'] as String? ?? 'USD',
-        conditions: j['conditions'] != null
-            ? OfferConditions.fromJson(j['conditions'] as Map<String, dynamic>)
-            : null,
-        offerExpiresAt: j['offerExpiresAt'] as String?,
-        status: j['status'] as String? ?? 'PENDING_PAYMENT',
-      );
+    bookingId: j['bookingId'] as String? ?? j['id'] as String? ?? '',
+    bookingRef: j['bookingRef'] as String? ?? '',
+    pricing: j['pricing'] != null
+        ? OfferPricing.fromJson(j['pricing'] as Map<String, dynamic>)
+        : OfferPricing.fromJson({}),
+    amount: double.tryParse(j['amount']?.toString() ?? '0') ?? 0,
+    currency: j['currency'] as String? ?? 'USD',
+    conditions: j['conditions'] != null
+        ? OfferConditions.fromJson(j['conditions'] as Map<String, dynamic>)
+        : null,
+    offerExpiresAt: j['offerExpiresAt'] as String?,
+    status: j['status'] as String? ?? 'PENDING_PAYMENT',
+  );
 }
 
 /// From GET /flights/bookings list
@@ -450,7 +448,7 @@ class FlightBookingListItem {
       FlightBookingListItem(
         id: j['id'] as String? ?? '',
         bookingRef:
-            j['booking_ref'] as String? ?? j['bookingRef'] as String? ?? '',
+        j['booking_ref'] as String? ?? j['bookingRef'] as String? ?? '',
         status: j['status'] as String? ?? '',
         totalAmount: (j['total_amount'] as num?)?.toDouble() ?? 0,
         currency: j['currency'] as String? ?? 'USD',
@@ -461,7 +459,8 @@ class FlightBookingListItem {
 }
 
 class PassengerInput {
-  final String type; // adult | child | infant_without_seat
+  /// API-accepted values: 'adult' | 'child' | 'infant_without_seat'
+  final String type;
   final String title; // mr | ms | mrs | dr
   final String firstName;
   final String lastName;
@@ -485,21 +484,24 @@ class PassengerInput {
     this.passportNumber,
     this.issuingCountry,
     this.passportExpiryDate,
-  });
+  }) : assert(
+  type == 'adult' || type == 'child' || type == 'infant_without_seat',
+  'PassengerInput.type must be one of: adult, child, infant_without_seat',
+  );
 
   Map<String, dynamic> toJson() => {
-        'firstName': firstName,
-        'lastName': lastName,
-        'dateOfBirth': dateOfBirth,
-        'gender': gender,
-        'title': title,
-        'email': email,
-        'phone': phone,
-        'passengerType': type,
-        if (passportNumber != null) 'passportNumber': passportNumber,
-        if (issuingCountry != null) 'issuingCountry': issuingCountry,
-        if (passportExpiryDate != null) 'passportExpiry': passportExpiryDate,
-      };
+    'type': type, // API field name is 'type', not 'passengerType'
+    'firstName': firstName,
+    'lastName': lastName,
+    'dateOfBirth': dateOfBirth,
+    'gender': gender,
+    'title': title,
+    'email': email,
+    'phone': phone,
+    if (passportNumber != null) 'passportNumber': passportNumber,
+    if (issuingCountry != null) 'issuingCountry': issuingCountry,
+    if (passportExpiryDate != null) 'passportExpiry': passportExpiryDate,
+  };
 }
 
 class SeatMapResult {
@@ -514,8 +516,8 @@ class SeatMapResult {
   });
 
   factory SeatMapResult.fromJson(Map<String, dynamic> j) => SeatMapResult(
-        available: j['available'] as bool? ?? false,
-        seatMaps: j['seatMaps'] as List<dynamic>? ?? [],
-        reason: j['reason'] as String?,
-      );
+    available: j['available'] as bool? ?? false,
+    seatMaps: j['seatMaps'] as List<dynamic>? ?? [],
+    reason: j['reason'] as String?,
+  );
 }

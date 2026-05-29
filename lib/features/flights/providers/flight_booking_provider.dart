@@ -54,10 +54,10 @@ class FlightBookingProvider extends ChangeNotifier {
   PaymentConfirmResult? get confirmResult => _confirmResult;
   bool get isLoading =>
       _step == BookingStep.searching ||
-      _step == BookingStep.loadingOffers ||
-      _step == BookingStep.initiatingBooking ||
-      _step == BookingStep.initiatingPayment ||
-      _step == BookingStep.confirmingPayment;
+          _step == BookingStep.loadingOffers ||
+          _step == BookingStep.initiatingBooking ||
+          _step == BookingStep.initiatingPayment ||
+          _step == BookingStep.confirmingPayment;
 
   // ── Step 1: Search ───────────────────────────────────────────────
   Future<bool> searchFlights({
@@ -67,7 +67,6 @@ class FlightBookingProvider extends ChangeNotifier {
     String? returnDate,
     int adults = 1,
     int children = 0,
-    int infants = 0,
     String cabinClass = 'economy',
   }) async {
     _step = BookingStep.searching;
@@ -85,7 +84,6 @@ class FlightBookingProvider extends ChangeNotifier {
         returnDate: returnDate,
         adults: adults,
         children: children,
-        infants: infants,
         cabinClass: cabinClass,
       );
       _offerRequestId = result.offerRequestId;
