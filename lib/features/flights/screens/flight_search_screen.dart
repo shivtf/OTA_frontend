@@ -1,9 +1,11 @@
 // lib/features/flights/screens/flight_search_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/routes/app_routes.dart';
+import '../../../core/services/meta_service.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/custom_back_button.dart';
 import '../../auth/widgets/gradient_button.dart';
@@ -19,9 +21,16 @@ class FlightSearchScreen extends StatefulWidget {
 class _FlightSearchScreenState extends State<FlightSearchScreen>
     with SingleTickerProviderStateMixin {
   String _tripType = 'One Way';
-  final _fromController = TextEditingController(text: 'DEL');
-  final _toController = TextEditingController(text: 'DXB');
-  // Store as DateTime internally, display formatted
+
+  // Each field has a display controller (shows "DEL · Indira Gandhi...")
+  // and a stored iataCode used for the actual search
+  final _fromDisplayController = TextEditingController();
+  final _toDisplayController = TextEditingController();
+  String _fromCode = 'JFK';
+  String _toCode = 'LAX';
+  String _fromCity = 'New York';
+  String _toCity = 'Los Angeles';
+
   DateTime _departDateTime = DateTime.now().add(const Duration(days: 14));
   DateTime _returnDateTime = DateTime.now().add(const Duration(days: 21));
   int _adults = 1;
@@ -29,14 +38,14 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
   String _cabin = 'Economy';
   bool _isSearching = false;
 
+  late TabController _tabController;
+  final List<String> _tripTypes = ['One Way', 'Round Trip', 'Multi-City'];
+  final List<String> _cabins = ['Economy', 'Business', 'First Class'];
+
   String get _departDate =>
       '${_departDateTime.year}-${_departDateTime.month.toString().padLeft(2, '0')}-${_departDateTime.day.toString().padLeft(2, '0')}';
   String get _returnDate =>
       '${_returnDateTime.year}-${_returnDateTime.month.toString().padLeft(2, '0')}-${_returnDateTime.day.toString().padLeft(2, '0')}';
-  String get _departDisplay =>
-      '${_departDateTime.day} ${_monthName(_departDateTime.month)}, ${_departDateTime.year}';
-  String get _returnDisplay =>
-      '${_returnDateTime.day} ${_monthName(_returnDateTime.month)}, ${_returnDateTime.year}';
 
   String _monthName(int m) => const [
         '',
@@ -54,40 +63,56 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         'Dec'
       ][m];
 
-  late TabController _tabController;
-
-  final List<String> _tripTypes = ['One Way', 'Round Trip', 'Multi-City'];
-  final List<String> _cabins = ['Economy', 'Business', 'First Class'];
+  String get _departDisplay =>
+      '${_departDateTime.day} ${_monthName(_departDateTime.month)}, ${_departDateTime.year}';
+  String get _returnDisplay =>
+      '${_returnDateTime.day} ${_monthName(_returnDateTime.month)}, ${_returnDateTime.year}';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Set initial display values
+    _fromDisplayController.text = 'JFK · New York';
+    _toDisplayController.text = 'LAX · Los Angeles';
   }
 
   @override
   void dispose() {
-    _fromController.dispose();
-    _toController.dispose();
+    _fromDisplayController.dispose();
+    _toDisplayController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
   void _swapAirports() {
-    final tmp = _fromController.text;
-    _fromController.text = _toController.text;
-    _toController.text = tmp;
-    setState(() {});
+    setState(() {
+      final tmpCode = _fromCode;
+      final tmpCity = _fromCity;
+      final tmpDisplay = _fromDisplayController.text;
+      _fromCode = _toCode;
+      _fromCity = _toCity;
+      _fromDisplayController.text = _toDisplayController.text;
+      _toCode = tmpCode;
+      _toCity = tmpCity;
+      _toDisplayController.text = tmpDisplay;
+    });
   }
 
   Future<void> _onSearch() async {
-    final from = _fromController.text.trim().toUpperCase();
-    final to = _toController.text.trim().toUpperCase();
-    if (from.isEmpty || to.isEmpty || from.length != 3 || to.length != 3) {
+    if (_fromCode.isEmpty || _toCode.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content:
-              Text('Please enter valid 3-letter airport codes (e.g. DEL, BOM)'),
+          content: Text('Please select origin and destination airports'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_fromCode == _toCode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Origin and destination cannot be the same'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -95,7 +120,6 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
     }
 
     setState(() => _isSearching = true);
-
     final provider = context.read<FlightBookingProvider>();
     provider.reset();
 
@@ -106,8 +130,8 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
     };
 
     final ok = await provider.searchFlights(
-      origin: from,
-      destination: to,
+      origin: _fromCode,
+      destination: _toCode,
       departureDate: _departDate,
       returnDate: _tripType == 'Round Trip' ? _returnDate : null,
       adults: _adults,
@@ -122,10 +146,10 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       Navigator.of(context).pushNamed(
         AppRoutes.flightResults,
         arguments: {
-          'from': from,
-          'to': to,
-          'fromCity': from,
-          'toCity': to,
+          'from': _fromCode,
+          'to': _toCode,
+          'fromCity': _fromCity,
+          'toCity': _toCity,
           'departureDate': _departDate,
         },
       );
@@ -140,6 +164,29 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
     }
   }
 
+  /// Opens the airport/city search bottom sheet and returns selected place
+  Future<void> _openPlacePicker({required bool isFrom}) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final result = await showModalBottomSheet<PlaceResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PlacePickerSheet(isDark: isDark),
+    );
+    if (result == null) return;
+    setState(() {
+      if (isFrom) {
+        _fromCode = result.iataCode;
+        _fromCity = result.city.isNotEmpty ? result.city : result.name;
+        _fromDisplayController.text = result.shortLabel;
+      } else {
+        _toCode = result.iataCode;
+        _toCity = result.city.isNotEmpty ? result.city : result.name;
+        _toDisplayController.text = result.shortLabel;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -150,44 +197,28 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
           isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: CustomScrollView(
         slivers: [
-          // App bar
-          SliverToBoxAdapter(
-            child: _buildHeader(context, isDark, tc),
-          ),
-
+          SliverToBoxAdapter(child: _buildHeader(context, isDark, tc)),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Trip type tabs
                   _buildTripTypeTabs(isDark),
                   const SizedBox(height: 24),
-
-                  // From / To card
                   _buildRouteCard(isDark),
                   const SizedBox(height: 16),
-
-                  // Date row
                   _buildDateRow(isDark),
                   const SizedBox(height: 16),
-
-                  // Passengers + cabin row
                   _buildPassengerCabinRow(isDark),
                   const SizedBox(height: 32),
-
-                  // Search button
                   GradientButton(
                     text: 'Search Flights',
                     icon: Icons.search_rounded,
                     isLoading: _isSearching,
                     onPressed: _isSearching ? null : _onSearch,
                   ),
-
                   const SizedBox(height: 32),
-
-                  // Recent searches
                   _buildRecentSearches(isDark),
                 ],
               ),
@@ -324,30 +355,31 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         children: [
           Column(
             children: [
-              // From
-              _AirportField(
+              // From — tappable, opens picker
+              _AirportTile(
                 label: 'From',
                 icon: Icons.flight_takeoff_rounded,
-                controller: _fromController,
+                iataCode: _fromCode,
+                displayText: _fromDisplayController.text,
                 isDark: isDark,
-                isTop: true,
+                onTap: () => _openPlacePicker(isFrom: true),
               ),
               Divider(
                 height: 1,
                 color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                 indent: 56,
               ),
-              // To
-              _AirportField(
+              // To — tappable, opens picker
+              _AirportTile(
                 label: 'To',
                 icon: Icons.flight_land_rounded,
-                controller: _toController,
+                iataCode: _toCode,
+                displayText: _toDisplayController.text,
                 isDark: isDark,
-                isTop: false,
+                onTap: () => _openPlacePicker(isFrom: false),
               ),
             ],
           ),
-
           // Swap button
           Positioned(
             right: 16,
@@ -383,7 +415,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         Expanded(
           child: _DateCard(
             label: 'Departure',
-            date: _departDate,
+            date: _departDisplay,
             icon: Icons.calendar_today_rounded,
             isDark: isDark,
             onTap: () => _pickDate(context, isDark, isDepart: true),
@@ -392,8 +424,8 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         const SizedBox(width: 12),
         Expanded(
           child: _DateCard(
-            label: _tripType == 'One Way' ? 'Return' : 'Return',
-            date: _tripType == 'One Way' ? 'Add date' : _returnDate,
+            label: 'Return',
+            date: _tripType == 'One Way' ? 'Add date' : _returnDisplay,
             icon: Icons.calendar_today_rounded,
             isDark: isDark,
             disabled: _tripType == 'One Way',
@@ -440,7 +472,6 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       {'from': 'BOM', 'to': 'LHR', 'date': 'Jul 3'},
       {'from': 'MAA', 'to': 'SIN', 'date': 'Jul 20'},
     ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -460,9 +491,14 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
               date: r['date']!,
               isDark: isDark,
               onTap: () {
-                _fromController.text = r['from']!;
-                _toController.text = r['to']!;
-                setState(() {});
+                setState(() {
+                  _fromCode = r['from']!;
+                  _toCode = r['to']!;
+                  _fromDisplayController.text = r['from']!;
+                  _toDisplayController.text = r['to']!;
+                  _fromCity = r['from']!;
+                  _toCity = r['to']!;
+                });
               },
             )),
       ],
@@ -482,8 +518,6 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
       ),
     );
     if (picked != null) {
-      final formatted =
-          '${_monthName(picked.month)} ${picked.day}, ${picked.year}';
       setState(() {
         if (isDepart)
           _departDateTime = picked;
@@ -501,23 +535,14 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => StatefulBuilder(
-        builder: (ctx, setLocal) => Padding(
+        builder: (ctx, setSheetState) => Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
               Text('Passengers',
                   style: TextStyle(
-                    fontSize: AppSizes.fontXL,
+                    fontSize: AppSizes.fontLG,
                     fontWeight: FontWeight.w700,
                     color: isDark
                         ? AppColors.darkTextPrimary
@@ -530,17 +555,9 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                 value: _adults,
                 isDark: isDark,
                 onDecrement: () {
-                  if (_adults > 1)
-                    setLocal(() {
-                      setState(() => _adults--);
-                    });
+                  if (_adults > 1) setSheetState(() => _adults--);
                 },
-                onIncrement: () {
-                  if (_adults < 9)
-                    setLocal(() {
-                      setState(() => _adults++);
-                    });
-                },
+                onIncrement: () => setSheetState(() => _adults++),
               ),
               const SizedBox(height: 16),
               _CounterRow(
@@ -549,24 +566,19 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
                 value: _children,
                 isDark: isDark,
                 onDecrement: () {
-                  if (_children > 0)
-                    setLocal(() {
-                      setState(() => _children--);
-                    });
+                  if (_children > 0) setSheetState(() => _children--);
                 },
-                onIncrement: () {
-                  if (_children < 8)
-                    setLocal(() {
-                      setState(() => _children++);
-                    });
-                },
+                onIncrement: () => setSheetState(() => _children++),
               ),
               const SizedBox(height: 24),
               GradientButton(
                 text: 'Done',
-                height: 48,
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  setState(() {});
+                  Navigator.pop(context);
+                },
               ),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -586,173 +598,447 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
             Text('Cabin Class',
                 style: TextStyle(
-                  fontSize: AppSizes.fontXL,
+                  fontSize: AppSizes.fontLG,
                   fontWeight: FontWeight.w700,
                   color: isDark
                       ? AppColors.darkTextPrimary
                       : AppColors.lightTextPrimary,
                 )),
-            const SizedBox(height: 20),
-            ..._cabins.map((c) => GestureDetector(
+            const SizedBox(height: 16),
+            ..._cabins.map((c) => ListTile(
+                  title: Text(c,
+                      style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary)),
+                  trailing: _cabin == c
+                      ? Icon(Icons.check_circle_rounded,
+                          color: AppColors.primaryStart)
+                      : null,
                   onTap: () {
                     setState(() => _cabin = c);
                     Navigator.pop(context);
                   },
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      gradient: _cabin == c ? AppColors.primaryGradient : null,
-                      color: _cabin != c
-                          ? (isDark
-                              ? AppColors.darkInputBg
-                              : AppColors.lightInputBg)
-                          : null,
-                      borderRadius: BorderRadius.circular(14),
-                      border: _cabin != c
-                          ? Border.all(
-                              color: isDark
-                                  ? AppColors.darkBorder
-                                  : AppColors.lightBorder)
-                          : null,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.airline_seat_recline_extra_rounded,
-                          color: _cabin == c
-                              ? Colors.white
-                              : AppColors.primaryStart,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          c,
-                          style: TextStyle(
-                            fontSize: AppSizes.fontMD,
-                            fontWeight: FontWeight.w600,
-                            color: _cabin == c
-                                ? Colors.white
-                                : (isDark
-                                    ? AppColors.darkTextPrimary
-                                    : AppColors.lightTextPrimary),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (_cabin == c)
-                          const Icon(Icons.check_circle_rounded,
-                              color: Colors.white, size: 20),
-                      ],
+                )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Airport tile (tappable, not editable directly) ────────────────────────────
+
+class _AirportTile extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String iataCode;
+  final String displayText;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _AirportTile({
+    required this.label,
+    required this.icon,
+    required this.iataCode,
+    required this.displayText,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.primaryStart.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: AppColors.primaryStart, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
                     ),
                   ),
-                )),
+                  const SizedBox(height: 2),
+                  // Big IATA code
+                  Text(
+                    iataCode,
+                    style: TextStyle(
+                      fontSize: AppSizes.fontXXL,
+                      fontWeight: FontWeight.w800,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  // City / airport name below
+                  if (displayText.isNotEmpty)
+                    Text(
+                      displayText.contains('·')
+                          ? displayText.split('·').last.trim()
+                          : displayText,
+                      style: TextStyle(
+                        fontSize: AppSizes.fontXS,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Place Picker bottom sheet with live search ────────────────────────────────
+
+class _PlacePickerSheet extends StatefulWidget {
+  final bool isDark;
+  const _PlacePickerSheet({required this.isDark});
+
+  @override
+  State<_PlacePickerSheet> createState() => _PlacePickerSheetState();
+}
+
+class _PlacePickerSheetState extends State<_PlacePickerSheet> {
+  final _searchController = TextEditingController();
+  final _metaService = MetaService();
+  final _focusNode = FocusNode();
+
+  List<PlaceResult> _results = [];
+  bool _isLoading = false;
+  String _lastQuery = '';
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-focus the search field when sheet opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+    _searchController.addListener(_onQueryChanged);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged() {
+    final q = _searchController.text.trim();
+    if (q == _lastQuery) return;
+    _lastQuery = q;
+
+    _debounce?.cancel();
+    if (q.length < 2) {
+      setState(() => _results = []);
+      return;
+    }
+    // 400ms debounce — avoids hammering the API on every keystroke
+    _debounce = Timer(const Duration(milliseconds: 400), () => _search(q));
+  }
+
+  Future<void> _search(String query) async {
+    setState(() => _isLoading = true);
+    try {
+      final results = await _metaService.searchPlaces(query);
+      if (mounted) setState(() => _results = results);
+    } catch (_) {
+      if (mounted) setState(() => _results = []);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final bg = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: borderColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Search Airport or City',
+                style: TextStyle(
+                  fontSize: AppSizes.fontLG,
+                  fontWeight: FontWeight.w700,
+                  color: isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightTextPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Search field
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color:
+                      isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 14),
+                    Icon(Icons.search_rounded,
+                        color: AppColors.primaryStart, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _focusNode,
+                        style: TextStyle(
+                          fontSize: AppSizes.fontMD,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. New York, Los Angeles, JFK...',
+                          hintStyle: TextStyle(
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary,
+                            fontSize: AppSizes.fontSM,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    if (_searchController.text.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          _searchController.clear();
+                          setState(() => _results = []);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: Icon(Icons.close_rounded,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
+                              size: 18),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Results
+            Expanded(
+              child: _buildResults(isDark, scrollController),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // String _monthName(int m) => const [
-  //       '',
-  //       'Jan',
-  //       'Feb',
-  //       'Mar',
-  //       'Apr',
-  //       'May',
-  //       'Jun',
-  //       'Jul',
-  //       'Aug',
-  //       'Sep',
-  //       'Oct',
-  //       'Nov',
-  //       'Dec'
-  //     ][m];
-}
+  Widget _buildResults(bool isDark, ScrollController scrollController) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryStart),
+      );
+    }
 
-// ── Sub-widgets ────────────────────────────────────────────────────────────────
+    if (_searchController.text.length < 2) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.travel_explore_rounded,
+                size: 56,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary),
+            const SizedBox(height: 12),
+            Text(
+              'Type to search airports & cities',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
+                fontSize: AppSizes.fontSM,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-class _AirportField extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final TextEditingController controller;
-  final bool isDark;
-  final bool isTop;
+    if (_results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off_rounded,
+                size: 56,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary),
+            const SizedBox(height: 12),
+            Text(
+              'No results for "${_searchController.text}"',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
+                fontSize: AppSizes.fontSM,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-  const _AirportField({
-    required this.label,
-    required this.icon,
-    required this.controller,
-    required this.isDark,
-    required this.isTop,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
+    return ListView.separated(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      itemCount: _results.length,
+      separatorBuilder: (_, __) => Divider(
+        height: 1,
+        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+        indent: 56,
+      ),
+      itemBuilder: (_, i) {
+        final place = _results[i];
+        final isCity = place.type == 'city';
+        return ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          leading: Container(
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primaryStart.withValues(alpha: 0.12),
+              color: isCity
+                  ? AppColors.primaryStart.withValues(alpha: 0.12)
+                  : AppColors.success.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppColors.primaryStart, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
-                  ),
-                ),
-                TextField(
-                  controller: controller,
-                  style: TextStyle(
-                    fontSize: AppSizes.fontXXL,
-                    fontWeight: FontWeight.w800,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.lightTextPrimary,
-                    letterSpacing: 2,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    filled: false,
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                ),
-              ],
+            child: Icon(
+              isCity ? Icons.location_city_rounded : Icons.flight_rounded,
+              color: isCity ? AppColors.primaryStart : AppColors.success,
+              size: 20,
             ),
           ),
-        ],
-      ),
+          title: Text(
+            place.name,
+            style: TextStyle(
+              fontSize: AppSizes.fontMD,
+              fontWeight: FontWeight.w700,
+              color: isDark
+                  ? AppColors.darkTextPrimary
+                  : AppColors.lightTextPrimary,
+            ),
+          ),
+          subtitle: Text(
+            '${place.iataCode} · ${place.city} · ${place.countryCode}${isCity ? ' · All airports' : ''}',
+            style: TextStyle(
+              fontSize: AppSizes.fontXS,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+            ),
+          ),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primaryStart.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                  color: AppColors.primaryStart.withValues(alpha: 0.2)),
+            ),
+            child: Text(
+              place.iataCode,
+              style: const TextStyle(
+                fontSize: AppSizes.fontSM,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primaryStart,
+                letterSpacing: 1,
+              ),
+            ),
+          ),
+          onTap: () => Navigator.pop(context, place),
+        );
+      },
     );
   }
 }
+
+// ── Shared sub-widgets (unchanged) ────────────────────────────────────────────
 
 class _DateCard extends StatelessWidget {
   final String label;
@@ -781,8 +1067,7 @@ class _DateCard extends StatelessWidget {
           color: isDark ? AppColors.darkCard : AppColors.lightCard,
           borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
           border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          ),
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         ),
         child: Row(
           children: [
