@@ -12,6 +12,9 @@ import '../widgets/destination_card.dart';
 import '../widgets/home_search_bar.dart';
 import '../../home/widgets/quick_category_row.dart';
 import '../../profiles/screens/profile_screen.dart';
+import '../../profiles/screens/my_bookings_screen.dart';
+import '../../profiles/screens/update_profile_screen.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,7 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _navIndex,
         children: [
           _HomeTab(isDark: isDark, tc: tc),
-          // Flights tab → tapping nav goes to flight search
           _PlaceholderTab(
               icon: Icons.flight_rounded, label: 'Flights', isDark: isDark),
           _PlaceholderTab(
@@ -79,26 +81,19 @@ class _HomeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        // Header with greeting + avatar
         SliverToBoxAdapter(child: _HomeHeader(isDark: isDark, tc: tc)),
-
-        // Search bar
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: HomeSearchBar(isDark: isDark),
           ),
         ),
-
-        // Quick categories
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
             child: QuickCategoryRow(isDark: isDark),
           ),
         ),
-
-        // Popular destinations
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
@@ -130,7 +125,6 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
         ),
-
         SliverToBoxAdapter(
           child: SizedBox(
             height: 200,
@@ -145,8 +139,6 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
         ),
-
-        // Hot deals
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
@@ -179,7 +171,6 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
         ),
-
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (ctx, i) {
@@ -193,7 +184,6 @@ class _HomeTab extends StatelessWidget {
             childCount: 3,
           ),
         ),
-
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
@@ -233,7 +223,6 @@ class _HomeHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top row: greeting + avatar + theme toggle
               Row(
                 children: [
                   Expanded(
@@ -282,25 +271,11 @@ class _HomeHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Avatar
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.2),
-                      border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.4), width: 2),
-                    ),
-                    child: const Icon(Icons.person_rounded,
-                        color: Colors.white, size: 24),
-                  ),
+                  // Avatar with initials + dropdown
+                  _ProfileAvatarButton(isDark: isDark),
                 ],
               ),
-
               const SizedBox(height: 20),
-
-              // Stats row
               Row(
                 children: [
                   _StatChip(
@@ -327,6 +302,522 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
+// ─── Profile Avatar Button with Dropdown ──────────────────────────────────────
+class _ProfileAvatarButton extends StatelessWidget {
+  final bool isDark;
+  const _ProfileAvatarButton({required this.isDark});
+
+  void _showMenu(BuildContext context) {
+    final user = context.read<AuthProvider>().user;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _ProfileMenuSheet(
+        isDark: isDark,
+        userName: user?.fullName ?? 'Traveler',
+        userEmail: user?.email ?? '',
+        initials: user != null
+            ? '${user.firstName.isNotEmpty ? user.firstName[0] : ''}${user.lastName.isNotEmpty ? user.lastName[0] : ''}'
+                .toUpperCase()
+            : '?',
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    final initials = user != null
+        ? '${user.firstName.isNotEmpty ? user.firstName[0] : ''}${user.lastName.isNotEmpty ? user.lastName[0] : ''}'
+            .toUpperCase()
+        : '?';
+
+    return GestureDetector(
+      onTap: () => _showMenu(context),
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFD166), Color(0xFFFF6B8A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border:
+              Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Profile Menu Bottom Sheet ────────────────────────────────────────────────
+class _ProfileMenuSheet extends StatelessWidget {
+  final bool isDark;
+  final String userName;
+  final String userEmail;
+  final String initials;
+
+  const _ProfileMenuSheet({
+    required this.isDark,
+    required this.userName,
+    required this.userEmail,
+    required this.initials,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
+            blurRadius: 32,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 20),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // User info header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFFFD166), Color(0xFFFF6B8A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        style: TextStyle(
+                          fontSize: AppSizes.fontMD,
+                          fontWeight: FontWeight.w800,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        userEmail,
+                        style: TextStyle(
+                          fontSize: AppSizes.fontXS,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppColors.success.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_rounded,
+                          color: AppColors.success, size: 11),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Verified',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Divider(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            height: 1,
+            indent: 20,
+            endIndent: 20,
+          ),
+
+          const SizedBox(height: 8),
+
+          // Menu items
+          _MenuItem(
+            icon: Icons.person_outline_rounded,
+            label: 'View Profile',
+            isDark: isDark,
+            onTap: () {
+              Navigator.of(context).pop();
+              // Navigate to dedicated profile screen pushed as route
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const ProfileScreen(),
+                  transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                    position: Tween<Offset>(
+                            begin: const Offset(1, 0), end: Offset.zero)
+                        .animate(CurvedAnimation(
+                            parent: anim, curve: Curves.easeOutCubic)),
+                    child: child,
+                  ),
+                  transitionDuration: const Duration(milliseconds: 320),
+                ),
+              );
+            },
+          ),
+
+          _MenuItem(
+            icon: Icons.edit_outlined,
+            label: 'Update Profile',
+            isDark: isDark,
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const UpdateProfileScreen(),
+                  transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                    position: Tween<Offset>(
+                            begin: const Offset(1, 0), end: Offset.zero)
+                        .animate(CurvedAnimation(
+                            parent: anim, curve: Curves.easeOutCubic)),
+                    child: child,
+                  ),
+                  transitionDuration: const Duration(milliseconds: 320),
+                ),
+              );
+            },
+          ),
+
+          _MenuItem(
+            icon: Icons.flight_takeoff_rounded,
+            label: 'My Bookings',
+            isDark: isDark,
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const MyBookingsScreen(),
+                  transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                    position: Tween<Offset>(
+                            begin: const Offset(1, 0), end: Offset.zero)
+                        .animate(CurvedAnimation(
+                            parent: anim, curve: Curves.easeOutCubic)),
+                    child: child,
+                  ),
+                  transitionDuration: const Duration(milliseconds: 320),
+                ),
+              );
+            },
+          ),
+
+          _MenuItem(
+            icon: Icons.lock_outline_rounded,
+            label: 'Change Password',
+            isDark: isDark,
+            onTap: () {
+              Navigator.of(context).pop();
+              // Placeholder – dedicated screen to be implemented
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Change Password coming soon!'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.primaryStart,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  margin: const EdgeInsets.all(16),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 8),
+          Divider(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            height: 1,
+            indent: 20,
+            endIndent: 20,
+          ),
+          const SizedBox(height: 8),
+
+          // Logout
+          _MenuItem(
+            icon: Icons.logout_rounded,
+            label: 'Sign Out',
+            isDark: isDark,
+            isDestructive: true,
+            onTap: () => _confirmLogout(context, isDark),
+          ),
+
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  void _confirmLogout(BuildContext context, bool isDark) {
+    Navigator.of(context).pop(); // close menu
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  shape: BoxShape.circle),
+              child:
+                  Icon(Icons.logout_rounded, color: AppColors.error, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Sign Out?',
+              style: TextStyle(
+                fontSize: AppSizes.fontXXL,
+                fontWeight: FontWeight.w800,
+                color: isDark
+                    ? AppColors.darkTextPrimary
+                    : AppColors.lightTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You\'ll need to sign in again to access your bookings.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: AppSizes.fontSM,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize:
+                          const Size(double.infinity, AppSizes.buttonHeightSM),
+                      side: BorderSide(
+                          color: isDark
+                              ? AppColors.darkBorder
+                              : AppColors.lightBorder),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? AppColors.darkTextPrimary
+                            : AppColors.lightTextPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await context.read<AuthProvider>().logout();
+                      if (context.mounted) {
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                            AppRoutes.login, (_) => false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      minimumSize:
+                          const Size(double.infinity, AppSizes.buttonHeightSM),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Sign Out',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isDark;
+  final bool isDestructive;
+  final VoidCallback onTap;
+
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.isDark,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive
+        ? AppColors.error
+        : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary);
+    final iconBg = isDestructive
+        ? AppColors.error.withValues(alpha: 0.1)
+        : AppColors.primaryStart.withValues(alpha: 0.08);
+    final iconColor = isDestructive ? AppColors.error : AppColors.primaryStart;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDestructive
+                ? AppColors.error.withValues(alpha: 0.04)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: AppSizes.fontMD,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isDestructive
+                    ? AppColors.error.withValues(alpha: 0.5)
+                    : (isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Stat Chip ────────────────────────────────────────────────────────────────
 class _StatChip extends StatelessWidget {
   final IconData icon;
   final String label;
