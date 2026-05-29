@@ -11,6 +11,7 @@ import '../widgets/deal_card.dart';
 import '../widgets/destination_card.dart';
 import '../widgets/home_search_bar.dart';
 import '../../home/widgets/quick_category_row.dart';
+import '../../profiles/screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,16 +30,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor:
-      isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: IndexedStack(
         index: _navIndex,
         children: [
           _HomeTab(isDark: isDark, tc: tc),
           // Flights tab → tapping nav goes to flight search
-          _PlaceholderTab(icon: Icons.flight_rounded, label: 'Flights', isDark: isDark),
-          _PlaceholderTab(icon: Icons.hotel_rounded, label: 'Hotels', isDark: isDark),
-          _PlaceholderTab(icon: Icons.directions_car_rounded, label: 'Cars', isDark: isDark),
-          _PlaceholderTab(icon: Icons.person_rounded, label: 'Profile', isDark: isDark),
+          _PlaceholderTab(
+              icon: Icons.flight_rounded, label: 'Flights', isDark: isDark),
+          _PlaceholderTab(
+              icon: Icons.hotel_rounded, label: 'Hotels', isDark: isDark),
+          _PlaceholderTab(
+              icon: Icons.directions_car_rounded,
+              label: 'Cars',
+              isDark: isDark),
+          const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: WanderlyNavBar(
@@ -176,7 +182,7 @@ class _HomeTab extends StatelessWidget {
 
         SliverList(
           delegate: SliverChildBuilderDelegate(
-                (ctx, i) {
+            (ctx, i) {
               final flights = FlightData.search(from: '', to: '');
               if (i >= flights.length) return null;
               return Padding(
@@ -206,15 +212,15 @@ class _HomeHeader extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        )
+                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
             : const LinearGradient(
-          colors: [Color(0xFF6C3CE1), Color(0xFF9B5CFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+                colors: [Color(0xFF6C3CE1), Color(0xFF9B5CFF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
@@ -238,7 +244,7 @@ class _HomeHeader extends StatelessWidget {
                           _greeting(),
                           style: TextStyle(
                             fontSize: AppSizes.fontSM,
-                            color: Colors.white.withValues(alpha:0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             fontWeight: FontWeight.w400,
                           ),
                         ),
@@ -262,10 +268,10 @@ class _HomeHeader extends StatelessWidget {
                       height: 40,
                       margin: const EdgeInsets.only(right: 10),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha:0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: Colors.white.withValues(alpha:0.25)),
+                            color: Colors.white.withValues(alpha: 0.25)),
                       ),
                       child: Icon(
                         isDark
@@ -282,9 +288,9 @@ class _HomeHeader extends StatelessWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha:0.2),
-                      border:
-                      Border.all(color: Colors.white.withValues(alpha:0.4), width: 2),
+                      color: Colors.white.withValues(alpha: 0.2),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.4), width: 2),
                     ),
                     child: const Icon(Icons.person_rounded,
                         color: Colors.white, size: 24),
@@ -297,11 +303,13 @@ class _HomeHeader extends StatelessWidget {
               // Stats row
               Row(
                 children: [
-                  _StatChip(icon: Icons.flight_takeoff_rounded, label: '12 Trips'),
+                  _StatChip(
+                      icon: Icons.flight_takeoff_rounded, label: '12 Trips'),
                   const SizedBox(width: 10),
                   _StatChip(icon: Icons.star_rounded, label: '4.9 Rating'),
                   const SizedBox(width: 10),
-                  _StatChip(icon: Icons.location_on_rounded, label: '8 Countries'),
+                  _StatChip(
+                      icon: Icons.location_on_rounded, label: '8 Countries'),
                 ],
               ),
             ],
@@ -329,9 +337,9 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha:0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha:0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

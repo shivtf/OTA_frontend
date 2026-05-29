@@ -19,6 +19,12 @@ class AuthProvider extends ChangeNotifier {
   bool get awaitingVerification => _awaitingVerification;
   String? get pendingEmail => _pendingEmail;
 
+  // Called by ProfileScreen after refreshing /auth/me
+  void setUser(UserProfile profile) {
+    _user = profile;
+    notifyListeners();
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();

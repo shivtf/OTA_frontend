@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/services/flight_service.dart';
@@ -36,6 +37,7 @@ class FlightCard extends StatelessWidget {
     final stops = offer.stops;
 
     return GestureDetector(
+      key: ValueKey(offer.offerId),
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -48,12 +50,12 @@ class FlightCard extends StatelessWidget {
           boxShadow: isDark
               ? null
               : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -70,49 +72,98 @@ class FlightCard extends StatelessWidget {
                       color: AppColors.primaryStart.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: offer.airlineLogoUrl.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              offer.airlineLogoUrl,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.flight_rounded,
+                    child: Builder(builder: (context) {
+                      // owner.logoUrl from list endpoint is often null;
+                      // marketingCarrier.logoUrl is always populated per segment
+                      final logoUrl = offer.airlineLogoUrl.isNotEmpty
+                          ? offer.airlineLogoUrl
+                          : (offer.outbound.segments.isNotEmpty
+                          ? offer.outbound.segments.first.marketingCarrier?.logoUrl ?? ''
+                          : '');
+                      if (logoUrl.isEmpty) {
+                        return const Icon(
+                          Icons.flight_rounded,
+                          color: AppColors.primaryStart,
+                          size: 20,
+                        );
+                      }
+                      // Duffel CDN serves SVG logos — use SvgPicture
+                      final isSvg = logoUrl.toLowerCase().endsWith('.svg');
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: isSvg
+                            ? SvgPicture.network(
+                          logoUrl,
+                          key: ValueKey(logoUrl),
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.contain,
+                          placeholderBuilder: (_) => const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
                                 color: AppColors.primaryStart,
-                                size: 20,
                               ),
                             ),
-                          )
-                        : const Icon(
+                          ),
+                        )
+                            : Image.network(
+                          logoUrl,
+                          key: ValueKey(logoUrl),
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(
                             Icons.flight_rounded,
                             color: AppColors.primaryStart,
                             size: 20,
                           ),
+                        ),
+                      );
+                    }),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          offer.airline,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: AppSizes.fontMD,
-                            color: isDark
-                                ? AppColors.darkTextPrimary
-                                : AppColors.lightTextPrimary,
-                          ),
-                        ),
-                        Text(
-                          offer.airlineIata,
-                          style: TextStyle(
-                            fontSize: AppSizes.fontXS,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                          ),
-                        ),
+                        Builder(builder: (context) {
+                          final mc = offer.outbound.segments.isNotEmpty
+                              ? offer.outbound.segments.first.marketingCarrier
+                              : null;
+                          final airlineName = offer.airline.isNotEmpty
+                              ? offer.airline
+                              : (mc?.name ?? 'Unknown Airline');
+                          final airlineIata = offer.airlineIata.isNotEmpty
+                              ? offer.airlineIata
+                              : (mc?.iataCode ?? '');
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                airlineName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppSizes.fontMD,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              Text(
+                                airlineIata,
+                                style: TextStyle(
+                                  fontSize: AppSizes.fontXS,
+                                  color: isDark
+                                      ? AppColors.darkTextSecondary
+                                      : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
                       ],
                     ),
                   ),

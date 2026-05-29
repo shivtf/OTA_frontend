@@ -25,6 +25,8 @@ dependencies:
   # ── Local Storage ─────────────────────────────────────────────────
   shared_preferences: ^2.2.3
 
+  flutter_svg: ^2.0.10+1
+
   # ── Deep Links ────────────────────────────────────────────────────
   # Handles otaapp:// scheme for email verification
   app_links: ^6.3.2
