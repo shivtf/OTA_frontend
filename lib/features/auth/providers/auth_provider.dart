@@ -1,3 +1,7 @@
+// lib/features/auth/providers/auth_provider.dart
+//
+// Added: resetPassword() — calls POST /auth/reset-password with token + newPassword
+
 import 'package:flutter/foundation.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/network/api_client.dart';
@@ -126,8 +130,6 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ── Change password (authenticated) ────────────────────────────
-  // Returns true on success. On success the backend revokes all other
-  // refresh tokens, so the user stays logged in on this device only.
   Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -161,6 +163,28 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       _error = e.message;
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // ── Reset password (unauthenticated, token from email link) ────
+  // Calls POST /auth/reset-password with { token, newPassword }.
+  // On success the backend revokes all existing refresh tokens.
+  Future<bool> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    _setLoading(true);
+    try {
+      await _service.resetPassword(token, newPassword);
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
       return false;
     } finally {
       _setLoading(false);

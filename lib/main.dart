@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:app_links/app_links.dart';
 import 'app.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/payment/models/stripe_service.dart';
@@ -22,9 +23,18 @@ void main() async {
 
   StripeService.init();
 
-  // ✅ Await auto-login BEFORE runApp so isLoggedIn is ready immediately
   final authProvider = AuthProvider();
   await authProvider.tryAutoLogin();
 
-  runApp(WanderlyApp(authProvider: authProvider)); // ✅ pass it in
+  // Resolve the initial deep link before runApp so it is available
+  // synchronously when the first frame builds — no race condition.
+  Uri? initialDeepLink;
+  try {
+    initialDeepLink = await AppLinks().getInitialLink();
+  } catch (_) {}
+
+  runApp(WanderlyApp(
+    authProvider: authProvider,
+    initialDeepLink: initialDeepLink,
+  ));
 }
