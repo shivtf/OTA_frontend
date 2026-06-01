@@ -15,6 +15,7 @@ import '../../features/home/screens/home_screen.dart';
 import '../../features/flights/screens/flight_search_screen.dart';
 import '../../features/flights/screens/flight_results_screen.dart';
 import '../../features/flights/screens/flight_details_screen.dart';
+import '../../features/flights/screens/passenger_form_screen.dart';
 import '../../features/flights/screens/seat_map_screen.dart';
 import '../../features/hotels/screens/hotel_search_screen.dart';
 import '../../features/hotels/screens/hotel_results_screen.dart';
@@ -37,6 +38,7 @@ class AppRoutes {
   static const String flightSearch = '/flights/search';
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details';
+  static const String passengerForm = '/flights/passenger-form';
   static const String seatMap = '/flights/seat-map'; // ← NEW
   static const String hotelSearch = '/hotels/search';
   static const String hotelResults = '/hotels/results';
@@ -83,6 +85,8 @@ class AppRoutes {
         return _slide(const FlightResultsScreen(), settings);
       case flightDetails:
         return _slide(const FlightDetailsScreen(), settings);
+      case passengerForm:
+        return _slide(const PassengerFormScreen(), settings);
       case seatMap: // ← NEW
         return _slideUp(const SeatMapScreen(), settings);
       case hotelSearch:

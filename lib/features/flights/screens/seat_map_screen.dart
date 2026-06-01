@@ -2,8 +2,10 @@
 //
 // Usage: Navigate with arguments:
 //   Navigator.pushNamed(context, AppRoutes.seatMap, arguments: {
-//     'offerId': 'off_xxx',
-//     'flightInfo': 'DEL → DXB · Economy · Jun 15',
+//     'offerId':        'off_xxx',
+//     'flightInfo':     'DEL → DXB · Economy · Jun 15',
+//     'passengerCount': 3,                          // total pax
+//     'passengerNames': ['Adult 1','Child 1', ...], // optional display names
 //   });
 // Returns: List<String> of selected service IDs via Navigator.pop()
 
@@ -31,16 +33,22 @@ class _SeatMapScreenState extends State<SeatMapScreen>
   String? _error;
   SeatMapResult? _seatMapResult;
 
-  // Selected seats: serviceId → deck/cabin/row/column info
-  final Map<String, _SelectedSeat> _selectedSeats = {};
+  // ── Multi-passenger seat assignment ───────────────────────────────────────
+  // _assignments[passengerIndex] = _SelectedSeat | null
+  late List<_SelectedSeat?> _assignments;
+  // Reverse lookup: serviceId → passengerIndex
+  final Map<String, int> _serviceToPassenger = {};
+
+  // Which passenger the user is currently assigning a seat for
+  int _activePassengerIndex = 0;
 
   // Which segment/deck we're viewing
   int _currentSegmentIndex = 0;
-  int _currentDeckIndex = 0;
 
   String _offerId = '';
   String _flightInfo = '';
   int _passengerCount = 1;
+  List<String> _passengerNames = [];
 
   @override
   void initState() {
@@ -61,13 +69,25 @@ class _SeatMapScreenState extends State<SeatMapScreen>
       _offerId = args['offerId'] as String? ?? '';
       _flightInfo = args['flightInfo'] as String? ?? '';
       _passengerCount = args['passengerCount'] as int? ?? 1;
+      _passengerNames = (args['passengerNames'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
     }
+
+    // Ensure names list is exactly passengerCount long
+    while (_passengerNames.length < _passengerCount) {
+      _passengerNames.add('Passenger ${_passengerNames.length + 1}');
+    }
+
+    // Initialise assignment slots
+    _assignments = List.filled(_passengerCount, null);
+
     if (_offerId.isNotEmpty && _isLoading) {
       _loadSeatMap();
     } else if (_offerId.isEmpty) {
       setState(() {
         _isLoading = false;
-        _error = null;
         _seatMapResult = _buildMockSeatMap();
       });
       _animController.forward();
@@ -78,21 +98,15 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     try {
       final result = await _flightService.getSeatMap(_offerId);
       if (!mounted) return;
-      if (!result.available || result.seatMaps.isEmpty) {
-        setState(() {
-          _isLoading = false;
-          _seatMapResult = _buildMockSeatMap();
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _seatMapResult = result;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+        _seatMapResult = (!result.available || result.seatMaps.isEmpty)
+            ? _buildMockSeatMap()
+            : result;
+      });
       _animController.forward();
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      // Fall back to mock on error
       setState(() {
         _isLoading = false;
         _seatMapResult = _buildMockSeatMap();
@@ -101,36 +115,38 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     }
   }
 
-  /// Builds a realistic mock seat map for when the API returns empty/unavailable
-  SeatMapResult _buildMockSeatMap() {
-    return SeatMapResult(available: true, seatMaps: [_mockSegment()]);
-  }
+  // ── Mock data ──────────────────────────────────────────────────────────────
+
+  SeatMapResult _buildMockSeatMap() =>
+      SeatMapResult(available: true, seatMaps: [_mockSegment()]);
 
   Map<String, dynamic> _mockSegment() {
     final cabins = <Map<String, dynamic>>[];
 
-    // Business class — rows 1–4, 2-2 layout
+    // Business — rows 1–4, 2-2 layout
     final bizRows = <Map<String, dynamic>>[];
     for (int row = 1; row <= 4; row++) {
-      final sections = <Map<String, dynamic>>[];
-      // Left pair
-      sections.add({
-        'elements': [
-          _mockSeat(row, 'A', row <= 2),
-          _mockSeat(row, 'B', row == 1),
+      bizRows.add({
+        'sections': [
+          {
+            'elements': [
+              _mockSeat(row, 'A', row <= 2),
+              _mockSeat(row, 'B', row == 1)
+            ]
+          },
+          {
+            'elements': [
+              {'type': 'bassinet', 'designator': 'aisle'}
+            ]
+          },
+          {
+            'elements': [
+              _mockSeat(row, 'C', row == 2),
+              _mockSeat(row, 'D', false)
+            ]
+          },
         ],
       });
-      // Aisle
-      sections.add({
-        'elements': [
-          {'type': 'bassinet', 'designator': 'aisle'},
-        ],
-      });
-      // Right pair
-      sections.add({
-        'elements': [_mockSeat(row, 'C', row == 2), _mockSeat(row, 'D', false)],
-      });
-      bizRows.add({'sections': sections});
     }
     cabins.add({
       'cabin_class': 'business',
@@ -139,33 +155,32 @@ class _SeatMapScreenState extends State<SeatMapScreen>
       'wings': {'first_row_index': 99, 'last_row_index': 99},
     });
 
-    // Economy class — rows 10–35, 3-3 layout
+    // Economy — rows 10–35, 3-3 layout
     final ecoRows = <Map<String, dynamic>>[];
     for (int row = 10; row <= 35; row++) {
-      final sections = <Map<String, dynamic>>[];
-      // Left triple
-      sections.add({
-        'elements': [
-          _mockSeat(row, 'A', row % 5 == 0 || row % 7 == 2),
-          _mockSeat(row, 'B', row % 4 == 0),
-          _mockSeat(row, 'C', row % 6 == 0 || row % 3 == 1),
+      ecoRows.add({
+        'sections': [
+          {
+            'elements': [
+              _mockSeat(row, 'A', row % 5 == 0 || row % 7 == 2),
+              _mockSeat(row, 'B', row % 4 == 0),
+              _mockSeat(row, 'C', row % 6 == 0 || row % 3 == 1),
+            ],
+          },
+          {
+            'elements': [
+              {'type': 'bassinet', 'designator': 'aisle'}
+            ]
+          },
+          {
+            'elements': [
+              _mockSeat(row, 'D', row % 5 == 1),
+              _mockSeat(row, 'E', row % 4 == 2 || row % 7 == 0),
+              _mockSeat(row, 'F', row % 6 == 3),
+            ],
+          },
         ],
       });
-      // Aisle
-      sections.add({
-        'elements': [
-          {'type': 'bassinet', 'designator': 'aisle'},
-        ],
-      });
-      // Right triple
-      sections.add({
-        'elements': [
-          _mockSeat(row, 'D', row % 5 == 1),
-          _mockSeat(row, 'E', row % 4 == 2 || row % 7 == 0),
-          _mockSeat(row, 'F', row % 6 == 3),
-        ],
-      });
-      ecoRows.add({'sections': sections});
     }
     cabins.add({
       'cabin_class': 'economy',
@@ -190,48 +205,78 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                 'total_amount':
                     '${(15 + (row < 10 ? 80 : 0)).toStringAsFixed(2)}',
                 'total_currency': 'USD',
-              },
+              }
             ],
       'disclosures': [],
     };
   }
 
+  // ── Parsed cabins ──────────────────────────────────────────────────────────
+
   List<_CabinData> get _parsedCabins {
     if (_seatMapResult == null || _seatMapResult!.seatMaps.isEmpty) return [];
-    final segment =
-        _seatMapResult!.seatMaps[_currentSegmentIndex.clamp(
-          0,
-          _seatMapResult!.seatMaps.length - 1,
-        )];
-    final cabins = (segment['cabins'] as List<dynamic>? ?? []);
-    return cabins
+    final segment = _seatMapResult!.seatMaps[
+        _currentSegmentIndex.clamp(0, _seatMapResult!.seatMaps.length - 1)];
+    return (segment['cabins'] as List<dynamic>? ?? [])
         .map((c) => _CabinData.fromJson(c as Map<String, dynamic>))
         .toList();
   }
 
+  // ── Seat tap ───────────────────────────────────────────────────────────────
+
   void _toggleSeat(_SeatInfo seat) {
-    if (!seat.isAvailable) return;
+    if (!seat.isAvailable || seat.serviceId == null) return;
     HapticFeedback.lightImpact();
+
     setState(() {
-      if (_selectedSeats.containsKey(seat.serviceId)) {
-        _selectedSeats.remove(seat.serviceId);
-      } else {
-        if (_selectedSeats.length >= _passengerCount) {
-          // Remove oldest selection
-          _selectedSeats.remove(_selectedSeats.keys.first);
-        }
-        _selectedSeats[seat.serviceId!] = _SelectedSeat(
-          serviceId: seat.serviceId!,
-          designator: seat.designator,
-          amount: seat.amount,
-          currency: seat.currency,
-        );
+      final sid = seat.serviceId!;
+
+      // If tapping a seat already owned by any passenger → deassign it
+      if (_serviceToPassenger.containsKey(sid)) {
+        final ownerIdx = _serviceToPassenger.remove(sid)!;
+        _assignments[ownerIdx] = null;
+        // Set that passenger as the new active one so they can re-pick
+        _activePassengerIndex = ownerIdx;
+        return;
       }
+
+      // If the active passenger already has a seat → free the old one first
+      final current = _assignments[_activePassengerIndex];
+      if (current != null) {
+        _serviceToPassenger.remove(current.serviceId);
+      }
+
+      // Assign new seat to active passenger
+      _assignments[_activePassengerIndex] = _SelectedSeat(
+        serviceId: sid,
+        designator: seat.designator,
+        amount: seat.amount,
+        currency: seat.currency,
+      );
+      _serviceToPassenger[sid] = _activePassengerIndex;
+
+      // Auto-advance to the next unassigned passenger
+      _advanceToNextUnassigned();
     });
   }
 
+  /// Move _activePassengerIndex to the next passenger without a seat.
+  /// Wraps around; if all are assigned, stays on current.
+  void _advanceToNextUnassigned() {
+    for (int offset = 1; offset <= _passengerCount; offset++) {
+      final idx = (_activePassengerIndex + offset) % _passengerCount;
+      if (_assignments[idx] == null) {
+        _activePassengerIndex = idx;
+        return;
+      }
+    }
+    // All assigned — keep current so the user can still swap
+  }
+
+  int get _assignedCount => _assignments.where((s) => s != null).length;
+
   double get _totalExtra =>
-      _selectedSeats.values.fold(0.0, (s, seat) => s + seat.amount);
+      _assignments.fold(0.0, (s, seat) => s + (seat?.amount ?? 0.0));
 
   @override
   void dispose() {
@@ -239,17 +284,17 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     super.dispose();
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
     final surface = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final textPrimary = isDark
-        ? AppColors.darkTextPrimary
-        : AppColors.lightTextPrimary;
-    final textSec = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+    final textPri =
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSec =
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Scaffold(
       backgroundColor: bg,
@@ -259,55 +304,46 @@ class _SeatMapScreenState extends State<SeatMapScreen>
               opacity: _fadeAnim,
               child: Column(
                 children: [
-                  _buildAppBar(context, isDark, textPrimary, surface),
-                  _buildLegend(isDark, surface),
+                  _buildAppBar(context, isDark, textPri, surface),
+                  _buildPassengerSelector(isDark, surface, textPri, textSec),
+                  _buildLegend(isDark),
                   Expanded(
-                    child: _buildSeatMap(isDark, surface, textPrimary, textSec),
-                  ),
-                  _buildBottomBar(
-                    context,
-                    isDark,
-                    surface,
-                    textPrimary,
-                    textSec,
-                  ),
+                      child: _buildSeatMap(isDark, surface, textPri, textSec)),
+                  _buildBottomBar(context, isDark, surface, textPri, textSec),
                 ],
               ),
             ),
     );
   }
 
-  Widget _buildLoading(Color bg) {
-    return Scaffold(
-      backgroundColor: bg,
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryStart),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Loading seat map...',
-              style: TextStyle(
-                color: AppColors.primaryStart,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+  // ── App bar ────────────────────────────────────────────────────────────────
+
+  Widget _buildLoading(Color bg) => Scaffold(
+        backgroundColor: bg,
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(AppColors.primaryStart),
               ),
-            ),
-          ],
+              SizedBox(height: 20),
+              Text(
+                'Loading seat map...',
+                style: TextStyle(
+                  color: AppColors.primaryStart,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 
   Widget _buildAppBar(
-    BuildContext context,
-    bool isDark,
-    Color textPrimary,
-    Color surface,
-  ) {
+      BuildContext context, bool isDark, Color textPri, Color surface) {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 12,
@@ -328,7 +364,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context, []),
+            onTap: () => Navigator.pop(context, <String>[]),
             child: Container(
               width: 40,
               height: 40,
@@ -336,11 +372,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                 color: isDark ? AppColors.darkCard : AppColors.lightInputBg,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: textPrimary,
-                size: 18,
-              ),
+              child: Icon(Icons.arrow_back_ios_new_rounded,
+                  color: textPri, size: 18),
             ),
           ),
           const SizedBox(width: 16),
@@ -349,45 +382,39 @@ class _SeatMapScreenState extends State<SeatMapScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Select Your Seat',
+                  'Select Seats',
                   style: TextStyle(
-                    color: textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                      color: textPri,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700),
                 ),
                 if (_flightInfo.isNotEmpty)
-                  Text(
-                    _flightInfo,
-                    style: const TextStyle(
-                      color: AppColors.lightTextSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text(_flightInfo,
+                      style: const TextStyle(
+                          color: AppColors.lightTextSecondary, fontSize: 12)),
               ],
             ),
           ),
-          // Passenger count badge
+          // Assigned / total badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [AppColors.primaryStart, AppColors.primaryEnd],
-              ),
+                  colors: [AppColors.primaryStart, AppColors.primaryEnd]),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.person, color: Colors.white, size: 14),
+                const Icon(Icons.event_seat_rounded,
+                    color: Colors.white, size: 14),
                 const SizedBox(width: 4),
                 Text(
-                  '${_selectedSeats.length}/$_passengerCount',
+                  '$_assignedCount/$_passengerCount',
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -397,17 +424,156 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     );
   }
 
-  Widget _buildLegend(bool isDark, Color surface) {
+  // ── Passenger selector tabs ────────────────────────────────────────────────
+
+  Widget _buildPassengerSelector(
+      bool isDark, Color surface, Color textPri, Color textSec) {
+    if (_passengerCount <= 1) return const SizedBox.shrink();
+
     return Container(
       color: isDark ? AppColors.darkCard : const Color(0xFFF4F2FA),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select a passenger, then tap their seat:',
+            style: TextStyle(
+                color: textSec, fontSize: 11, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _passengerCount,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final isActive = i == _activePassengerIndex;
+                final isAssigned = _assignments[i] != null;
+                final seat = _assignments[i];
+
+                return GestureDetector(
+                  onTap: () => setState(() => _activePassengerIndex = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: isActive
+                          ? const LinearGradient(colors: [
+                              AppColors.primaryStart,
+                              AppColors.primaryEnd
+                            ])
+                          : null,
+                      color: isActive
+                          ? null
+                          : isDark
+                              ? AppColors.darkSurface
+                              : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isActive
+                            ? Colors.transparent
+                            : isAssigned
+                                ? _seatAssignedBorderColor
+                                : AppColors.lightTextSecondary.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isAssigned
+                              ? Icons.event_seat_rounded
+                              : Icons.person_outline_rounded,
+                          size: 14,
+                          color: isActive
+                              ? Colors.white
+                              : isAssigned
+                                  ? _seatAssignedBorderColor
+                                  : textSec,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          isAssigned
+                              ? '${_passengerNames[i]}: ${seat!.designator}'
+                              : _passengerNames[i],
+                          style: TextStyle(
+                            color: isActive
+                                ? Colors.white
+                                : isAssigned
+                                    ? _seatAssignedBorderColor
+                                    : textSec,
+                            fontWeight:
+                                isActive ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                        // Show ✕ to deassign if assigned but not active
+                        if (isAssigned && !isActive) ...[
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _serviceToPassenger
+                                  .remove(_assignments[i]!.serviceId);
+                              _assignments[i] = null;
+                              _activePassengerIndex = i;
+                            }),
+                            child: Icon(Icons.close_rounded,
+                                size: 12, color: _seatAssignedBorderColor),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Hint for active passenger
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [AppColors.primaryStart, AppColors.primaryEnd]),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Now picking for: ${_passengerNames[_activePassengerIndex]}',
+                style: const TextStyle(
+                  color: AppColors.primaryStart,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Legend ─────────────────────────────────────────────────────────────────
+
+  Widget _buildLegend(bool isDark) {
+    return Container(
+      color: isDark ? AppColors.darkCard : const Color(0xFFF4F2FA),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _legendItem(_seatAvailableColor, 'Available'),
-          _legendItem(_seatSelectedColor, 'Selected'),
-          _legendItem(_seatOccupiedColor, 'Occupied'),
-          _legendItem(_seatExitColor, 'Exit Row'),
+          _legendItem(_seatActiveColor, 'Yours (active)'),
+          _legendItem(_seatAssignedColor, 'Assigned'),
+          _legendItem(_seatOccupiedColor, 'Taken'),
         ],
       ),
     );
@@ -418,52 +584,38 @@ class _SeatMapScreenState extends State<SeatMapScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 18,
-          height: 18,
+          width: 16,
+          height: 16,
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
-          ),
+              color: color, borderRadius: BorderRadius.circular(4)),
         ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.lightTextSecondary,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        const SizedBox(width: 4),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 10,
+                color: AppColors.lightTextSecondary,
+                fontWeight: FontWeight.w500)),
       ],
     );
   }
 
+  // ── Seat grid ──────────────────────────────────────────────────────────────
+
   Widget _buildSeatMap(
-    bool isDark,
-    Color surface,
-    Color textPrimary,
-    Color textSec,
-  ) {
+      bool isDark, Color surface, Color textPri, Color textSec) {
     final cabins = _parsedCabins;
     if (cabins.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.event_seat_rounded,
-              size: 64,
-              color: AppColors.lightTextSecondary.withOpacity(0.4),
-            ),
+            Icon(Icons.event_seat_rounded,
+                size: 64, color: AppColors.lightTextSecondary.withOpacity(0.4)),
             const SizedBox(height: 16),
-            const Text(
-              'Seat map not available\nfor this flight',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.lightTextSecondary,
-                fontSize: 15,
-              ),
-            ),
+            const Text('Seat map not available\nfor this flight',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: AppColors.lightTextSecondary, fontSize: 15)),
           ],
         ),
       );
@@ -472,23 +624,24 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
-        children: cabins.map((cabin) {
-          return _buildCabin(cabin, isDark, surface, textPrimary, textSec);
-        }).toList(),
+        children: cabins
+            .map((cabin) =>
+                _buildCabin(cabin, cabins, isDark, surface, textPri, textSec))
+            .toList(),
       ),
     );
   }
 
   Widget _buildCabin(
     _CabinData cabin,
+    List<_CabinData> allCabins,
     bool isDark,
     Color surface,
-    Color textPrimary,
+    Color textPri,
     Color textSec,
   ) {
     return Column(
       children: [
-        // Cabin header
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -516,104 +669,67 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                     ? 'Business Class'
                     : 'Economy Class',
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13),
               ),
             ],
           ),
         ),
-
-        // Nose of plane at top of first cabin
-        if (cabins.indexOf(cabin) == 0) _buildPlaneNose(isDark),
-
-        // Rows
-        ...cabin.rows.asMap().entries.map((entry) {
-          final rowIndex = entry.key;
-          final row = entry.value;
-          final isWingRow =
+        if (allCabins.indexOf(cabin) == 0) _buildPlaneNose(isDark),
+        ...cabin.rows.asMap().entries.map((e) {
+          final rowIndex = e.key;
+          final row = e.value;
+          final isWing =
               rowIndex >= cabin.wingsFirst && rowIndex <= cabin.wingsLast;
-          return _buildRow(
-            row,
-            rowIndex,
-            isWingRow,
-            isDark,
-            surface,
-            textPrimary,
-          );
+          return _buildRow(row, rowIndex, isWing, isDark);
         }),
-
         const SizedBox(height: 8),
       ],
     );
   }
 
-  Widget _buildPlaneNose(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: CustomPaint(
-        size: const Size(200, 50),
-        painter: _PlaneNosePainter(
-          isDark: isDark,
-          color: isDark ? AppColors.darkCard : const Color(0xFFE8E4F0),
+  Widget _buildPlaneNose(bool isDark) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: CustomPaint(
+          size: const Size(200, 50),
+          painter: _PlaneNosePainter(
+            isDark: isDark,
+            color: isDark ? AppColors.darkCard : const Color(0xFFE8E4F0),
+          ),
         ),
-      ),
-    );
-  }
+      );
 
-  Widget _buildRow(
-    _RowData row,
-    int rowIndex,
-    bool isWingRow,
-    bool isDark,
-    Color surface,
-    Color textPrimary,
-  ) {
+  Widget _buildRow(_RowData row, int rowIndex, bool isWingRow, bool isDark) {
     return Container(
       color: isWingRow
-          ? (isDark
-                ? AppColors.primaryStart.withOpacity(0.05)
-                : AppColors.primaryStart.withOpacity(0.03))
+          ? AppColors.primaryStart.withOpacity(isDark ? 0.05 : 0.03)
           : Colors.transparent,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Wing indicator (left)
           SizedBox(
             width: 24,
             child: isWingRow
-                ? Icon(
-                    Icons.airplanemode_active_rounded,
-                    size: 14,
-                    color: AppColors.primaryStart.withOpacity(0.4),
-                  )
+                ? Icon(Icons.airplanemode_active_rounded,
+                    size: 14, color: AppColors.primaryStart.withOpacity(0.4))
                 : null,
           ),
-
-          // Sections of this row
           ...row.sections.map((section) {
-            if (section.isAisle) {
-              return const SizedBox(width: 20);
-            }
+            if (section.isAisle) return const SizedBox(width: 20);
             return Row(
               mainAxisSize: MainAxisSize.min,
-              children: section.seats.map((seat) {
-                return _buildSeatCell(seat, isDark);
-              }).toList(),
+              children: section.seats
+                  .map((seat) => _buildSeatCell(seat, isDark))
+                  .toList(),
             );
           }),
-
-          // Wing indicator (right)
           SizedBox(
             width: 24,
             child: isWingRow
-                ? Icon(
-                    Icons.airplanemode_active_rounded,
-                    size: 14,
-                    color: AppColors.primaryStart.withOpacity(0.4),
-                  )
+                ? Icon(Icons.airplanemode_active_rounded,
+                    size: 14, color: AppColors.primaryStart.withOpacity(0.4))
                 : null,
           ),
         ],
@@ -622,20 +738,40 @@ class _SeatMapScreenState extends State<SeatMapScreen>
   }
 
   Widget _buildSeatCell(_SeatInfo seat, bool isDark) {
-    final isSelected =
-        seat.serviceId != null && _selectedSeats.containsKey(seat.serviceId);
+    final sid = seat.serviceId;
+    final ownerIdx = sid != null ? _serviceToPassenger[sid] : null;
+    final isOwnedByActive =
+        ownerIdx != null && ownerIdx == _activePassengerIndex;
+    final isOwnedByOther =
+        ownerIdx != null && ownerIdx != _activePassengerIndex;
+
     Color seatColor;
     Color borderColor;
-    Color iconColor;
+    Color iconColor = Colors.white;
+    Widget? label;
 
     if (!seat.isAvailable) {
       seatColor = _seatOccupiedColor;
       borderColor = _seatOccupiedColor.withOpacity(0.6);
       iconColor = Colors.white.withOpacity(0.5);
-    } else if (isSelected) {
-      seatColor = _seatSelectedColor;
-      borderColor = _seatSelectedColor;
-      iconColor = Colors.white;
+    } else if (isOwnedByActive) {
+      // Active passenger's current seat
+      seatColor = _seatActiveColor;
+      borderColor = _seatActiveColor;
+      label = Text(
+        '${ownerIdx! + 1}',
+        style: const TextStyle(
+            color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
+      );
+    } else if (isOwnedByOther) {
+      // Another passenger's seat
+      seatColor = _seatAssignedColor;
+      borderColor = _seatAssignedBorderColor;
+      label = Text(
+        '${ownerIdx! + 1}',
+        style: const TextStyle(
+            color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
+      );
     } else if (seat.isExitRow) {
       seatColor = _seatExitColor.withOpacity(0.15);
       borderColor = _seatExitColor;
@@ -660,35 +796,38 @@ class _SeatMapScreenState extends State<SeatMapScreen>
           color: seatColor,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: borderColor, width: 1.5),
-          boxShadow: isSelected
+          boxShadow: (isOwnedByActive || isOwnedByOther)
               ? [
                   BoxShadow(
-                    color: _seatSelectedColor.withOpacity(0.4),
+                    color: borderColor.withOpacity(0.4),
                     blurRadius: 8,
                     spreadRadius: 1,
-                  ),
+                  )
                 ]
               : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              !seat.isAvailable
-                  ? Icons.close_rounded
-                  : isSelected
-                  ? Icons.check_rounded
-                  : Icons.event_seat_rounded,
-              color: isSelected || !seat.isAvailable ? Colors.white : iconColor,
-              size: 14,
-            ),
+            if (label != null)
+              label
+            else
+              Icon(
+                !seat.isAvailable
+                    ? Icons.close_rounded
+                    : Icons.event_seat_rounded,
+                color: !seat.isAvailable ? iconColor : iconColor,
+                size: 14,
+              ),
             if (seat.designator.isNotEmpty)
               Text(
                 seat.designator,
                 style: TextStyle(
-                  color: isSelected || !seat.isAvailable
+                  color: (isOwnedByActive || isOwnedByOther)
                       ? Colors.white
-                      : iconColor,
+                      : !seat.isAvailable
+                          ? Colors.white.withOpacity(0.5)
+                          : iconColor,
                   fontSize: 7,
                   fontWeight: FontWeight.w600,
                 ),
@@ -699,14 +838,17 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     );
   }
 
+  // ── Bottom bar ─────────────────────────────────────────────────────────────
+
   Widget _buildBottomBar(
     BuildContext context,
     bool isDark,
     Color surface,
-    Color textPrimary,
+    Color textPri,
     Color textSec,
   ) {
-    final hasSelection = _selectedSeats.isNotEmpty;
+    final hasAny = _assignedCount > 0;
+    final allAssigned = _assignedCount == _passengerCount;
 
     return Container(
       padding: EdgeInsets.only(
@@ -728,56 +870,79 @@ class _SeatMapScreenState extends State<SeatMapScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Selected seats chips
-          if (hasSelection) ...[
+          // Per-passenger seat chips
+          if (hasAny) ...[
             SizedBox(
               height: 36,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _selectedSeats.length,
+                itemCount: _passengerCount,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, i) {
-                  final seat = _selectedSeats.values.elementAt(i);
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.primaryStart, AppColors.primaryEnd],
+                  final assigned = _assignments[i];
+                  final isActive = i == _activePassengerIndex;
+
+                  return GestureDetector(
+                    onTap: () => setState(() => _activePassengerIndex = i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: assigned != null
+                            ? const LinearGradient(colors: [
+                                AppColors.primaryStart,
+                                AppColors.primaryEnd,
+                              ])
+                            : null,
+                        color: assigned == null
+                            ? isDark
+                                ? AppColors.darkCard
+                                : const Color(0xFFF0EEF8)
+                            : null,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isActive
+                              ? AppColors.primaryStart
+                              : Colors.transparent,
+                          width: 2,
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.event_seat_rounded,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          seat.designator,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            assigned != null
+                                ? Icons.event_seat_rounded
+                                : Icons.person_outline_rounded,
+                            color: assigned != null ? Colors.white : textSec,
+                            size: 13,
                           ),
-                        ),
-                        const SizedBox(width: 5),
-                        GestureDetector(
-                          onTap: () => setState(
-                            () => _selectedSeats.remove(seat.serviceId),
+                          const SizedBox(width: 5),
+                          Text(
+                            assigned != null
+                                ? '${_passengerNames[i]}: ${assigned.designator}'
+                                : _passengerNames[i],
+                            style: TextStyle(
+                              color: assigned != null ? Colors.white : textSec,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.white70,
-                            size: 14,
-                          ),
-                        ),
-                      ],
+                          if (assigned != null) ...[
+                            const SizedBox(width: 5),
+                            GestureDetector(
+                              onTap: () => setState(() {
+                                _serviceToPassenger.remove(assigned.serviceId);
+                                _assignments[i] = null;
+                                _activePassengerIndex = i;
+                              }),
+                              child: const Icon(Icons.close_rounded,
+                                  color: Colors.white70, size: 13),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -786,42 +951,67 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             const SizedBox(height: 12),
           ],
 
+          // Progress hint when not all assigned
+          if (!allAssigned && _passengerCount > 1) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primaryStart.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 14, color: AppColors.primaryStart),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      allAssigned
+                          ? 'All seats selected!'
+                          : 'Tap a seat for ${_passengerNames[_activePassengerIndex]}',
+                      style: const TextStyle(
+                        color: AppColors.primaryStart,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           Row(
             children: [
-              // Price summary
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hasSelection ? 'Seat upgrade' : 'No seat selected',
+                      hasAny ? 'Seat upgrade' : 'No seats selected',
                       style: TextStyle(color: textSec, fontSize: 12),
                     ),
                     Text(
-                      hasSelection
+                      hasAny
                           ? '+\$${_totalExtra.toStringAsFixed(2)}'
-                          : 'Free random seat',
+                          : 'Free random seats',
                       style: TextStyle(
-                        color: textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                          color: textPri,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
               ),
-
-              // Confirm / Skip buttons
               Row(
                 children: [
-                  if (hasSelection)
+                  if (hasAny)
                     GestureDetector(
-                      onTap: () => Navigator.pop(context, []),
+                      onTap: () => Navigator.pop(context, <String>[]),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
+                            horizontal: 16, vertical: 14),
                         margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
                           color: isDark
@@ -829,28 +1019,24 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                               : AppColors.lightInputBg,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Text(
-                          'Skip',
-                          style: TextStyle(
-                            color: textSec,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: Text('Skip',
+                            style: TextStyle(
+                                color: textSec, fontWeight: FontWeight.w600)),
                       ),
                     ),
                   GestureDetector(
                     onTap: () {
                       HapticFeedback.mediumImpact();
-                      Navigator.pop(
-                        context,
-                        _selectedSeats.values.map((s) => s.serviceId).toList(),
-                      );
+                      // Return only the assigned serviceIds (non-null)
+                      final serviceIds = _assignments
+                          .where((s) => s != null)
+                          .map((s) => s!.serviceId)
+                          .toList();
+                      Navigator.pop(context, serviceIds);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
+                          horizontal: 24, vertical: 14),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [
@@ -868,12 +1054,11 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                         ],
                       ),
                       child: Text(
-                        hasSelection ? 'Confirm Seats' : 'Skip',
+                        hasAny ? 'Confirm Seats' : 'Skip',
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15),
                       ),
                     ),
                   ),
@@ -886,15 +1071,16 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     );
   }
 
+  // ── Colours ────────────────────────────────────────────────────────────────
   static const Color _seatAvailableColor = Color(0xFF4CAF82);
-  static const Color _seatSelectedColor = AppColors.primaryStart;
+  static const Color _seatActiveColor = AppColors.primaryStart;
+  static const Color _seatAssignedColor = Color(0xFF7B61FF);
+  static const Color _seatAssignedBorderColor = Color(0xFF5E48CC);
   static const Color _seatOccupiedColor = Color(0xFFB0A8C8);
   static const Color _seatExitColor = Color(0xFFFF9800);
-
-  List<_CabinData> get cabins => _parsedCabins;
 }
 
-// ── Data models for parsed seat map ──────────────────────────────────────────
+// ── Data models ───────────────────────────────────────────────────────────────
 
 class _CabinData {
   final String cabinClass;
@@ -945,19 +1131,16 @@ class _SectionData {
 
   factory _SectionData.fromJson(Map<String, dynamic> j) {
     final elements = j['elements'] as List<dynamic>? ?? [];
-    if (elements.any(
-      (e) =>
-          (e as Map<String, dynamic>)['designator'] == 'aisle' ||
-          (e as Map<String, dynamic>)['type'] == 'bassinet',
-    )) {
-      // Check if this is an aisle gap
+    if (elements.any((e) {
+      final el = e as Map<String, dynamic>;
+      return el['designator'] == 'aisle' || el['type'] == 'bassinet';
+    })) {
       final first = elements.first as Map<String, dynamic>;
       if (first['designator'] == 'aisle' ||
-          elements.length == 1 && first['type'] != 'seat') {
+          (elements.length == 1 && first['type'] != 'seat')) {
         return _SectionData(isAisle: true, seats: []);
       }
     }
-
     final seats = elements
         .where((e) {
           final el = e as Map<String, dynamic>;
@@ -966,7 +1149,6 @@ class _SectionData {
         .map((e) => _SeatInfo.fromJson(e as Map<String, dynamic>))
         .where((s) => s.designator.isNotEmpty)
         .toList();
-
     return _SectionData(isAisle: seats.isEmpty, seats: seats);
   }
 }
@@ -995,7 +1177,7 @@ class _SeatInfo {
     double amount = 0.0;
     String currency = 'USD';
 
-    if (isAvailable && services.isNotEmpty) {
+    if (isAvailable) {
       final svc = services.first as Map<String, dynamic>;
       serviceId = svc['id'] as String?;
       amount = double.tryParse(svc['total_amount']?.toString() ?? '0') ?? 0.0;
@@ -1003,9 +1185,8 @@ class _SeatInfo {
     }
 
     final disclosures = j['disclosures'] as List<dynamic>? ?? [];
-    final isExit = disclosures.any(
-      (d) => (d as String).toLowerCase().contains('exit'),
-    );
+    final isExit =
+        disclosures.any((d) => (d as String).toLowerCase().contains('exit'));
 
     return _SeatInfo(
       designator: j['designator'] as String? ?? '',
@@ -1032,7 +1213,7 @@ class _SelectedSeat {
   });
 }
 
-// ── Plane nose painter ─────────────────────────────────────────────────────
+// ── Plane nose painter ─────────────────────────────────────────────────────────
 
 class _PlaneNosePainter extends CustomPainter {
   final bool isDark;
@@ -1044,28 +1225,21 @@ class _PlaneNosePainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-
-    final path = Path();
-    path.moveTo(size.width * 0.2, size.height);
-    path.quadraticBezierTo(size.width * 0.5, 0, size.width * 0.8, size.height);
-    path.close();
+    final path = Path()
+      ..moveTo(size.width * 0.2, size.height)
+      ..quadraticBezierTo(size.width * 0.5, 0, size.width * 0.8, size.height)
+      ..close();
     canvas.drawPath(path, paint);
 
-    // Window strip
-    final windowPaint = Paint()
-      ..color = AppColors.primaryStart.withOpacity(0.2)
-      ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * 0.35,
-          size.height * 0.5,
-          size.width * 0.3,
-          size.height * 0.35,
-        ),
+        Rect.fromLTWH(size.width * 0.35, size.height * 0.5, size.width * 0.3,
+            size.height * 0.35),
         const Radius.circular(4),
       ),
-      windowPaint,
+      Paint()
+        ..color = AppColors.primaryStart.withOpacity(0.2)
+        ..style = PaintingStyle.fill,
     );
   }
 

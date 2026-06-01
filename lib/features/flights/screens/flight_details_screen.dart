@@ -5,10 +5,10 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/routes/app_routes.dart';
+import '../../../core/services/flight_service.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/custom_back_button.dart';
 import '../../auth/widgets/gradient_button.dart';
-import '../models/flight_offer.dart';
 
 class FlightDetailsScreen extends StatefulWidget {
   const FlightDetailsScreen({super.key});
@@ -115,14 +115,14 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
       if (_isLoadingDetails || _fetchError == null) {
         return Scaffold(
           backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+              isDark ? AppColors.darkBackground : AppColors.lightBackground,
           body: const Center(child: CircularProgressIndicator()),
         );
       }
       // Fetch failed and no seed offer available
       return Scaffold(
         backgroundColor:
-        isDark ? AppColors.darkBackground : AppColors.lightBackground,
+            isDark ? AppColors.darkBackground : AppColors.lightBackground,
         body: SafeArea(
           child: Column(
             children: [
@@ -166,7 +166,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
 
     return Scaffold(
       backgroundColor:
-      isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SlideTransition(
@@ -223,10 +223,10 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        )
+                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
             : AppColors.primaryGradient,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
@@ -304,7 +304,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                 Container(
                   margin: const EdgeInsets.only(bottom: 20),
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
@@ -326,8 +326,10 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                           logoUrl: offer.airlineLogoUrl.isNotEmpty
                               ? offer.airlineLogoUrl
                               : (offer.outbound.segments.isNotEmpty
-                              ? offer.outbound.segments.first.marketingCarrier?.logoUrl ?? ''
-                              : ''),
+                                  ? offer.outbound.segments.first
+                                          .marketingCarrier?.logoUrl ??
+                                      ''
+                                  : ''),
                           size: 28,
                           fallbackIcon: Icons.airlines_rounded,
                         ),
@@ -515,7 +517,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
         'icon': Icons.airline_seat_recline_extra_rounded,
         'label': 'Segments',
         'value':
-        '${offer.outbound.segments.length} segment${offer.outbound.segments.length > 1 ? 's' : ''}',
+            '${offer.outbound.segments.length} segment${offer.outbound.segments.length > 1 ? 's' : ''}',
       },
       {
         'icon': Icons.access_time_rounded,
@@ -684,7 +686,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                 alignment: Alignment.centerLeft,
                 child: Container(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -747,10 +749,10 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
         label: 'Wi-Fi',
         value: available
             ? (cost == 'free'
-            ? 'Free'
-            : cost == 'paid'
-            ? 'Paid'
-            : 'Available')
+                ? 'Free'
+                : cost == 'paid'
+                    ? 'Paid'
+                    : 'Available')
             : 'Not available',
         positive: available,
       ));
@@ -764,7 +766,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
       final type = seat['type'] as String?;
       final detail = [
         if (type != null && type.isNotEmpty) type,
-        if (pitch != null && pitch.isNotEmpty) 'Pitch: ${pitch}"',
+        if (pitch != null && pitch.isNotEmpty) 'Pitch: $pitch"',
         if (legroom != null && legroom != 'n/a' && legroom.isNotEmpty)
           'Legroom: $legroom',
       ].join(' · ');
@@ -860,10 +862,11 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
     final pax = seg.passengers.isNotEmpty ? seg.passengers.first : null;
     final baggages = pax?.baggages ?? [];
     final extraBagService =
-    offer.availableServices.where((s) => s.type == 'baggage').toList();
+        offer.availableServices.where((s) => s.type == 'baggage').toList();
 
-    if (baggages.isEmpty && extraBagService.isEmpty)
+    if (baggages.isEmpty && extraBagService.isEmpty) {
       return const SizedBox.shrink();
+    }
 
     return _Section(
       title: 'Baggage',
@@ -874,7 +877,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
           if (baggages.isNotEmpty) ...[
             Row(
               children: [
-                Icon(Icons.check_circle_rounded,
+                const Icon(Icons.check_circle_rounded,
                     color: AppColors.success, size: 14),
                 const SizedBox(width: 6),
                 Text('Included baggage',
@@ -939,7 +942,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
               ),
             Row(
               children: [
-                Icon(Icons.add_circle_outline_rounded,
+                const Icon(Icons.add_circle_outline_rounded,
                     color: AppColors.primaryStart, size: 14),
                 const SizedBox(width: 6),
                 Text('Available add-ons',
@@ -959,7 +962,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
               final maxQty = svc.maximumQuantity ?? 1;
               return Container(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppColors.primaryStart.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
@@ -968,7 +971,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.luggage_rounded,
+                    const Icon(Icons.luggage_rounded,
                         color: AppColors.primaryStart, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1077,8 +1080,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
             label: 'Cancellation',
             value: isRefundable
                 ? refundPenalty != null
-                ? 'Refundable · Penalty: $refundPenalty'
-                : 'Free cancellation'
+                    ? 'Refundable · Penalty: $refundPenalty'
+                    : 'Free cancellation'
                 : 'Non-refundable',
             positive: isRefundable,
             isDark: isDark,
@@ -1089,8 +1092,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
             label: 'Date Change',
             value: isChangeable
                 ? changePenalty != null
-                ? 'Changeable · Fee: $changePenalty'
-                : 'Date change allowed'
+                    ? 'Changeable · Fee: $changePenalty'
+                    : 'Date change allowed'
                 : 'Not changeable',
             positive: isChangeable,
             isDark: isDark,
@@ -1120,11 +1123,25 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
         final flightInfo =
             '${slice.origin.iataCode} → ${slice.destination.iataCode}'
             ' · ${_formatDate(slice.departureAt)}';
+        // Build per-passenger display names for the seat map
+        final passengerNames = offer.passengers.asMap().entries.map((e) {
+          final type = e.value.type; // adult | child | infant_without_seat
+          final label = type == 'adult'
+              ? 'Adult ${e.key + 1}'
+              : type == 'child'
+                  ? 'Child ${e.key + 1}'
+                  : 'Infant ${e.key + 1}';
+          return label;
+        }).toList();
+
         Navigator.of(context).pushNamed(
           AppRoutes.seatMap,
           arguments: {
             'offerId': offer.offerId,
             'flightInfo': flightInfo,
+            'passengerCount':
+                offer.passengers.isNotEmpty ? offer.passengers.length : 1,
+            'passengerNames': passengerNames,
           },
         );
       },
@@ -1133,7 +1150,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 52),
         foregroundColor: AppColors.primaryStart,
-        side: BorderSide(color: AppColors.primaryStart, width: 1.5),
+        side: const BorderSide(color: AppColors.primaryStart, width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
         ),
@@ -1179,132 +1196,22 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
         const SizedBox(width: 20),
         Expanded(
           child: GradientButton(
-            text: 'Book Now',
-            icon: Icons.arrow_forward_rounded,
-            onPressed: () => _showBookingConfirm(context, offer, isDark),
+            text: 'Initialize Booking',
+            icon: Icons.person_add_rounded,
+            onPressed: () => _showPassengerForm(context, offer, isDark),
           ),
         ),
       ],
     );
   }
 
-  void _showBookingConfirm(
+  // ── Passenger Form → navigate to dedicated screen ────────────────────────
+
+  void _showPassengerForm(
       BuildContext context, FlightOffer offer, bool isDark) {
-    final slice = offer.outbound;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.flight_rounded,
-                  color: Colors.white, size: 30),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Confirm Booking',
-              style: TextStyle(
-                fontSize: AppSizes.fontXXL,
-                fontWeight: FontWeight.w800,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${slice.origin.iataCode} → ${slice.destination.iataCode}  ·  ${offer.airline}',
-              style: TextStyle(
-                fontSize: AppSizes.fontMD,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _ConfirmItem(
-                      label: 'Departure',
-                      value: _formatTime(slice.departureAt),
-                      isDark: isDark),
-                  _ConfirmItem(
-                      label: 'Arrival',
-                      value: _formatTime(slice.arrivalAt),
-                      isDark: isDark),
-                  _ConfirmItem(
-                    label: 'Total',
-                    value:
-                    '${offer.currency} ${offer.totalAmount.toStringAsFixed(0)}',
-                    isDark: isDark,
-                    highlight: true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            GradientButton(
-              text: 'Confirm & Pay',
-              icon: Icons.lock_rounded,
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Row(
-                      children: [
-                        Icon(Icons.check_circle_rounded,
-                            color: Colors.white, size: 18),
-                        SizedBox(width: 10),
-                        Text('Booking confirmed! 🎉',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    backgroundColor: AppColors.success,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.all(16),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+    Navigator.of(context).pushNamed(
+      AppRoutes.passengerForm,
+      arguments: offer,
     );
   }
 
@@ -1376,11 +1283,11 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
     try {
       final d = Duration(
         hours:
-        int.tryParse(RegExp(r'(\d+)H').firstMatch(iso)?.group(1) ?? '0') ??
-            0,
+            int.tryParse(RegExp(r'(\d+)H').firstMatch(iso)?.group(1) ?? '0') ??
+                0,
         minutes:
-        int.tryParse(RegExp(r'(\d+)M').firstMatch(iso)?.group(1) ?? '0') ??
-            0,
+            int.tryParse(RegExp(r'(\d+)M').firstMatch(iso)?.group(1) ?? '0') ??
+                0,
       );
       final h = d.inHours;
       final m = d.inMinutes.remainder(60);
@@ -1405,7 +1312,7 @@ class _LoadingBanner extends StatelessWidget {
       color: AppColors.primaryStart.withValues(alpha: 0.08),
       child: Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 14,
             height: 14,
             child: CircularProgressIndicator(
@@ -1517,7 +1424,7 @@ class _SegmentTimelineItem extends StatelessWidget {
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColors.primaryStart.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(6),
@@ -1773,12 +1680,12 @@ class _Section extends StatelessWidget {
         boxShadow: isDark
             ? null
             : [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1822,9 +1729,9 @@ class _PriceRow extends StatelessWidget {
 
   const _PriceRow(
       {required this.label,
-        required this.amount,
-        required this.currency,
-        required this.isDark});
+      required this.amount,
+      required this.currency,
+      required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -1937,23 +1844,23 @@ class _ConfirmItem extends StatelessWidget {
         const SizedBox(height: 4),
         highlight
             ? ShaderMask(
-          shaderCallback: (b) =>
-              AppColors.primaryGradient.createShader(b),
-          child: Text(value,
-              style: const TextStyle(
-                fontSize: AppSizes.fontLG,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              )),
-        )
+                shaderCallback: (b) =>
+                    AppColors.primaryGradient.createShader(b),
+                child: Text(value,
+                    style: const TextStyle(
+                      fontSize: AppSizes.fontLG,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    )),
+              )
             : Text(value,
-            style: TextStyle(
-              fontSize: AppSizes.fontLG,
-              fontWeight: FontWeight.w800,
-              color: isDark
-                  ? AppColors.darkTextPrimary
-                  : AppColors.lightTextPrimary,
-            )),
+                style: TextStyle(
+                  fontSize: AppSizes.fontLG,
+                  fontWeight: FontWeight.w800,
+                  color: isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightTextPrimary,
+                )),
       ],
     );
   }
@@ -2040,7 +1947,7 @@ class _AirlineSegmentCard extends StatelessWidget {
           ),
 
         // ── Operating carrier (only when different) ───────────────────────
-        if (isDifferentOperator && oc != null) ...[
+        if (isDifferentOperator) ...[
           const SizedBox(height: 10),
           _CarrierRow(
             carrier: oc,
@@ -2104,7 +2011,7 @@ class _AirlineSegmentCard extends StatelessWidget {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color:
-                              AppColors.primaryStart.withValues(alpha: 0.1),
+                                  AppColors.primaryStart.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -2176,7 +2083,7 @@ class _AirlineSegmentCard extends StatelessWidget {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color:
-                              AppColors.primaryStart.withValues(alpha: 0.1),
+                                  AppColors.primaryStart.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -2285,12 +2192,12 @@ class _CarrierRow extends StatelessWidget {
             boxShadow: isDark
                 ? null
                 : [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              )
-            ],
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    )
+                  ],
           ),
           padding: const EdgeInsets.all(6),
           child: _AirlineLogo(
