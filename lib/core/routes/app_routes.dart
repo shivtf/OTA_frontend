@@ -1,8 +1,10 @@
 // lib/core/routes/app_routes.dart
 //
 // Updated to include:
-//   • /auth/email-verified  — deep-link target for email verification
-//   • /flights/seat-map     — seat selection screen
+//   • /auth/forgot-password  — forgot password screen
+//   • /auth/reset-password   — reset password (opened via deep link)
+//   • /auth/email-verified   — email verification deep-link target
+//   • /flights/seat-map      — seat selection screen
 //   • Deep link handler via onGenerateRoute parsing
 
 import 'package:flutter/material.dart';
@@ -11,6 +13,8 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/signup_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/auth/screens/email_verified_screen.dart';
+import '../../features/auth/screens/forgot_password_screen.dart'; // ← NEW
+import '../../features/auth/screens/reset_password_screen.dart'; // ← NEW
 import '../../features/home/screens/home_screen.dart';
 import '../../features/flights/screens/flight_search_screen.dart';
 import '../../features/flights/screens/flight_results_screen.dart';
@@ -33,13 +37,15 @@ class AppRoutes {
   static const String login = '/login';
   static const String signup = '/signup';
   static const String registration = '/registration';
-  static const String emailVerified = '/auth/email-verified'; // ← NEW
+  static const String emailVerified = '/auth/email-verified';
+  static const String forgotPassword = '/auth/forgot-password'; // ← NEW
+  static const String resetPassword = '/auth/reset-password'; // ← NEW
   static const String home = '/home';
   static const String flightSearch = '/flights/search';
   static const String flightResults = '/flights/results';
   static const String flightDetails = '/flights/details';
   static const String passengerForm = '/flights/passenger-form';
-  static const String seatMap = '/flights/seat-map'; // ← NEW
+  static const String seatMap = '/flights/seat-map';
   static const String hotelSearch = '/hotels/search';
   static const String hotelResults = '/hotels/results';
   static const String hotelDetails = '/hotels/details';
@@ -50,18 +56,41 @@ class AppRoutes {
   static const String paymentSuccess = '/payment/success';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    // ── Deep link: otaapp://auth/verified?status=success ──────────────────
-    // Flutter passes the path as the route name when using deep links.
-    // Intercept and map to our local route with parsed args.
-    if (settings.name != null && settings.name!.startsWith('/auth/verified')) {
-      final uri = Uri.tryParse(settings.name!);
-      final status = uri?.queryParameters['status'] ?? 'error';
-      final message = uri?.queryParameters['message'] ?? 'Verification failed.';
-      return _fade(
-        const EmailVerifiedScreen(),
+    // ── Deep link: otaapp://auth/verified?status=success ──────────────────────
+    if (settings.name != null &&
+        settings.name!.startsWith('/auth/reset-password')) {
+      // Token may come from arguments (navigator push) OR query params (raw deep link)
+      String token = '';
+
+      final args = settings.arguments;
+      if (args is Map && args['token'] != null) {
+        token = args['token'] as String; // ← from _handleLink via arguments
+      } else {
+        final uri = Uri.tryParse(settings.name!);
+        token = uri?.queryParameters['token'] ??
+            ''; // ← fallback for raw route name
+      }
+
+      return _slide(
+        const ResetPasswordScreen(),
         RouteSettings(
-          name: emailVerified,
-          arguments: {'status': status, 'message': message},
+          name: resetPassword,
+          arguments: {'token': token},
+        ),
+      );
+    }
+
+    // ── Deep link: otaapp://auth/reset-password?token=<TOKEN> ────────────────
+    // The backend email uses this scheme. Flutter receives it as a route name.
+    if (settings.name != null &&
+        settings.name!.startsWith('/auth/reset-password')) {
+      final uri = Uri.tryParse(settings.name!);
+      final token = uri?.queryParameters['token'] ?? '';
+      return _slide(
+        const ResetPasswordScreen(),
+        RouteSettings(
+          name: resetPassword,
+          arguments: {'token': token},
         ),
       );
     }
@@ -75,8 +104,12 @@ class AppRoutes {
         return _fade(const SignupScreen(), settings);
       case registration:
         return _fade(const RegistrationScreen(), settings);
-      case emailVerified: // ← NEW
+      case emailVerified:
         return _fade(const EmailVerifiedScreen(), settings);
+      case forgotPassword: // ← NEW
+        return _slide(const ForgotPasswordScreen(), settings);
+      case resetPassword: // ← NEW
+        return _slide(const ResetPasswordScreen(), settings);
       case home:
         return _fade(const HomeScreen(), settings);
       case flightSearch:
@@ -87,7 +120,7 @@ class AppRoutes {
         return _slide(const FlightDetailsScreen(), settings);
       case passengerForm:
         return _slide(const PassengerFormScreen(), settings);
-      case seatMap: // ← NEW
+      case seatMap:
         return _slideUp(const SeatMapScreen(), settings);
       case hotelSearch:
         return _slide(const HotelSearchScreen(), settings);

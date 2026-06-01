@@ -8,6 +8,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../providers/auth_provider.dart';
+import '../../../app.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -75,15 +76,26 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
     );
 
-    // ✅ If already logged in, skip the splash entirely and go straight home
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+
+      // Wait one extra frame — lets app.dart's _handleLink navigation settle
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return;
+
+      // Check if we've already been navigated away from splash
+      final currentRoute = ModalRoute.of(context)?.settings.name;
+      if (currentRoute != AppRoutes.splash) return; // deep link took over
+
+      final app = context.findAncestorWidgetOfExactType<WanderlyApp>();
+      if (app?.initialDeepLink != null) return;
+
       final auth = context.read<AuthProvider>();
       if (auth.isLoggedIn) {
         Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-        return; // don't start animations or timer
+        return;
       }
-      // Not logged in — start normal splash animations
+
       _fadeController.forward();
       _slideController.forward();
       _startAutoAdvance();
@@ -116,7 +128,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (_isLaunching) return;
 
     final renderBox =
-    _planeKey.currentContext?.findRenderObject() as RenderBox?;
+        _planeKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null) {
       final pos = renderBox.localToGlobal(Offset.zero);
       final size = renderBox.size;
@@ -128,11 +140,10 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    // ✅ Check auth state — go home if logged in, login screen if not
     final auth = context.read<AuthProvider>();
     Navigator.of(context).pushNamedAndRemoveUntil(
       auth.isLoggedIn ? AppRoutes.home : AppRoutes.login,
-          (_) => false,
+      (_) => false,
     );
   }
 
@@ -164,7 +175,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-
           if (_isLaunching)
             AnimatedBuilder(
               animation: _launchController,
@@ -173,9 +183,9 @@ class _SplashScreenState extends State<SplashScreen>
                 final curve = Curves.easeInQuart.transform(t);
                 final planeY = _planeCenter.dy - curve * screenH * 1.15;
                 final trailOpacity =
-                (t < 0.85 ? 1.0 : (1.0 - t) / 0.15).clamp(0.0, 1.0);
+                    (t < 0.85 ? 1.0 : (1.0 - t) / 0.15).clamp(0.0, 1.0);
                 final trailLength =
-                (_planeCenter.dy - planeY).clamp(0.0, screenH);
+                    (_planeCenter.dy - planeY).clamp(0.0, screenH);
 
                 return Stack(
                   children: [
@@ -216,27 +226,27 @@ class _SplashScreenState extends State<SplashScreen>
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-          colors: [
-            Color(0xFF060411),
-            Color(0xFF110B2E),
-            Color(0xFF2A1466),
-            Color(0xFF6C3CE1),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          stops: [0.0, 0.3, 0.65, 1.0],
-        )
+                colors: [
+                  Color(0xFF060411),
+                  Color(0xFF110B2E),
+                  Color(0xFF2A1466),
+                  Color(0xFF6C3CE1),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [0.0, 0.3, 0.65, 1.0],
+              )
             : const LinearGradient(
-          colors: [
-            Color(0xFF1A0A4E),
-            Color(0xFF3D1FA0),
-            Color(0xFF6C3CE1),
-            Color(0xFF9B5CFF),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          stops: [0.0, 0.3, 0.7, 1.0],
-        ),
+                colors: [
+                  Color(0xFF1A0A4E),
+                  Color(0xFF3D1FA0),
+                  Color(0xFF6C3CE1),
+                  Color(0xFF9B5CFF),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [0.0, 0.3, 0.7, 1.0],
+              ),
       ),
     );
   }
@@ -441,7 +451,7 @@ class _SplashScreenState extends State<SplashScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
             _pages.length,
-                (dotIndex) => GestureDetector(
+            (dotIndex) => GestureDetector(
               onTap: () {
                 _autoAdvanceTimer?.cancel();
                 _pageController.animateToPage(
@@ -474,8 +484,8 @@ class _SplashScreenState extends State<SplashScreen>
             itemCount: _pages.length,
             onPageChanged: (i) => setState(() => _currentPage = i),
             itemBuilder: (context, i) => Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.paddingXXL),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppSizes.paddingXXL),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
@@ -568,7 +578,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// ── Cloud shape ──────────────────────────────────────────────────────────────
+// ── Cloud shape ───────────────────────────────────────────────────────────────
 
 class _CloudShape extends StatelessWidget {
   final double width;
@@ -628,7 +638,7 @@ class _CloudPainter extends CustomPainter {
   bool shouldRepaint(covariant _CloudPainter old) => old.opacity != opacity;
 }
 
-// ── Contrail painter ─────────────────────────────────────────────────────────
+// ── Contrail painter ──────────────────────────────────────────────────────────
 
 class _ContrailPainter extends CustomPainter {
   final double progress;
