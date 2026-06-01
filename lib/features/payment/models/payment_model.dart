@@ -24,7 +24,7 @@ class BookingItem {
   final String detail2Value;
   final double basePrice;
   final double taxAmount;
-  final double serviceFee;
+  // final double serviceFee;
   final String emoji;
 
   /// The pending booking ID from POST /flights/book — sent to PaymentController.
@@ -49,15 +49,15 @@ class BookingItem {
     required this.detail2Value,
     required this.basePrice,
     required this.taxAmount,
-    required this.serviceFee,
+    // required this.serviceFee,
     required this.emoji,
     this.bookingId,
     this.currency = 'USD',
     this.duffelOfferId,
     this.passengers = const [],
   });
-
-  double get total => basePrice + taxAmount + serviceFee;
+  double get total => basePrice + taxAmount;
+  // double get total => basePrice + taxAmount + serviceFee;
 
   String get typeLabel {
     switch (type) {
@@ -91,7 +91,7 @@ class BookingItem {
     required String bookingId,
     required double baseAmount,
     required double taxAmount,
-    required double serviceFee,
+    // required double serviceFee,
     required String currency,
     required String flightTitle,
     required String flightSubtitle,
@@ -110,7 +110,7 @@ class BookingItem {
         detail2Value: arrivalTime,
         basePrice: baseAmount,
         taxAmount: taxAmount,
-        serviceFee: serviceFee,
+        // serviceFee: serviceFee,
         emoji: '✈️',
         bookingId: bookingId,
         currency: currency,

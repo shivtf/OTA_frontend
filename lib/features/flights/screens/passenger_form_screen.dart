@@ -86,7 +86,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     _genders = List.generate(count, (_) => 'male');
     _passengerTypes = List.generate(
       count,
-          (i) => _offerPassengers[i].type,
+      (i) => _offerPassengers[i].type,
     );
   }
 
@@ -156,6 +156,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
           arguments: {
             'booking': provider.currentBooking,
             'offer': _offer,
+            'passengers': passengers, // real PassengerInput list with names
           },
         );
       } else {
@@ -197,9 +198,9 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
     final textPrimary =
-    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final textSecondary =
-    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Scaffold(
       backgroundColor: bg,
@@ -224,7 +225,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
                   child: _offerPassengers.isEmpty
                       ? const Center(child: CircularProgressIndicator())
                       : _buildPassengerForm(_currentPassengerIndex, isDark,
-                      textPrimary, textSecondary),
+                          textPrimary, textSecondary),
                 ),
               ),
             ),
@@ -298,8 +299,8 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     final typeLabel = type == 'adult'
         ? 'Adult'
         : type == 'child'
-        ? 'Child'
-        : 'Infant';
+            ? 'Child'
+            : 'Infant';
     return '${index + 1}. $typeLabel';
   }
 
@@ -509,7 +510,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
               borderRadius: BorderRadius.circular(10),
             ),
             child:
-            const Icon(Icons.flight_rounded, color: Colors.white, size: 18),
+                const Icon(Icons.flight_rounded, color: Colors.white, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -599,7 +600,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
                 icon: Icons.badge_rounded,
                 isDark: isDark,
                 validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
             ),
             const SizedBox(width: 12),
@@ -611,7 +612,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
                 icon: Icons.badge_outlined,
                 isDark: isDark,
                 validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
             ),
           ],
@@ -735,11 +736,11 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
   // ── Date Picker ────────────────────────────────────────────────────────────
 
   Future<void> _pickDate(
-      BuildContext context,
-      TextEditingController ctrl, {
-        DateTime? firstDate,
-        DateTime? lastDate,
-      }) async {
+    BuildContext context,
+    TextEditingController ctrl, {
+    DateTime? firstDate,
+    DateTime? lastDate,
+  }) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -757,7 +758,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     );
     if (picked != null) {
       ctrl.text =
-      '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+          '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     }
   }
 }
@@ -807,8 +808,8 @@ class _PassengerProgressHeader extends StatelessWidget {
     final typeLabel = type == 'adult'
         ? 'Adult'
         : type == 'child'
-        ? 'Child'
-        : 'Infant';
+            ? 'Child'
+            : 'Infant';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -870,7 +871,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textPrimary =
-    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     return Row(
       children: [
@@ -947,9 +948,9 @@ class _InputField extends StatelessWidget {
     final inputBg = isDark ? AppColors.darkInputBg : AppColors.lightInputBg;
     final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final textPrimary =
-    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final textSecondary =
-    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return TextFormField(
       controller: controller,
@@ -976,7 +977,7 @@ class _InputField extends StatelessWidget {
         filled: true,
         fillColor: inputBg,
         contentPadding:
-        const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: border),
@@ -988,7 +989,7 @@ class _InputField extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide:
-          const BorderSide(color: AppColors.primaryStart, width: 1.5),
+              const BorderSide(color: AppColors.primaryStart, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1026,9 +1027,9 @@ class _DropdownField extends StatelessWidget {
     final inputBg = isDark ? AppColors.darkInputBg : AppColors.lightInputBg;
     final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final textPrimary =
-    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final textSecondary =
-    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return DropdownButtonFormField<String>(
       initialValue: value,
@@ -1047,7 +1048,7 @@ class _DropdownField extends StatelessWidget {
         filled: true,
         fillColor: inputBg,
         contentPadding:
-        const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: border),
@@ -1059,14 +1060,14 @@ class _DropdownField extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide:
-          const BorderSide(color: AppColors.primaryStart, width: 1.5),
+              const BorderSide(color: AppColors.primaryStart, width: 1.5),
         ),
       ),
       items: items
           .map((item) => DropdownMenuItem(
-        value: item,
-        child: Text(displayLabels[item] ?? item),
-      ))
+                value: item,
+                child: Text(displayLabels[item] ?? item),
+              ))
           .toList(),
     );
   }

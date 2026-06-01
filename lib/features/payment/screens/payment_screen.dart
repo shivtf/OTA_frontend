@@ -26,6 +26,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/custom_back_button.dart';
+import '../../../core/services/flight_service.dart';
 import '../controllers/payment_controller.dart';
 import '../models/payment_model.dart';
 import '../models/payment_result.dart';
@@ -43,7 +44,6 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen>
     with SingleTickerProviderStateMixin {
-
   // ── Payment method selection ─────────────────────────────────────────────
   // 0 = saved cards  |  1 = new card  |  2 = provider sheet
   int _selectedMethod = 0;
@@ -66,7 +66,7 @@ class _PaymentScreenState extends State<PaymentScreen>
     detail2Value: '11:15 AM',
     basePrice: 542.00,
     taxAmount: 65.04,
-    serviceFee: 15.00,
+    // serviceFee: 15.00,
     emoji: '✈️',
     bookingId: 'demo-booking-001',
     currency: 'USD',
@@ -112,7 +112,126 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   BookingItem _booking(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
+
+    // Direct BookingItem — hotel/car flows already build this themselves
     if (args is BookingItem) return args;
+
+    // Map from PassengerFormScreen:
+    //   { 'booking': FlightBooking, 'offer': FlightOffer, 'passengers': List<PassengerInput> }
+    if (args is Map) {
+      try {
+        final dynamic rawBooking = args['booking'];
+        final dynamic rawOffer = args['offer'];
+        final dynamic rawPassengers =
+            args['passengers']; // List<PassengerInput>
+
+        if (rawOffer == null) return _demoBooking;
+
+        final FlightOffer offer = rawOffer as FlightOffer;
+        final FlightBooking? booking = rawBooking as FlightBooking?;
+
+        // ── Pricing: prefer the confirmed booking price (post-API),
+        //    fall back to the offer price if booking is missing.
+        final pricing = booking?.pricing ?? offer.pricing;
+
+        // ── Passenger display names from the real form input
+        List<PassengerSummary> passengers = const [];
+        if (rawPassengers is List && rawPassengers.isNotEmpty) {
+          passengers = rawPassengers.asMap().entries.map((e) {
+            final dynamic p = e.value;
+            final String first = (p.firstName as String?)?.trim() ?? '';
+            final String last = (p.lastName as String?)?.trim() ?? '';
+            final String name = (first.isNotEmpty || last.isNotEmpty)
+                ? '$first $last'.trim()
+                : 'Passenger ${e.key + 1}';
+            final String type = (p.type as String?) ?? 'adult';
+            return PassengerSummary(name: name, type: type);
+          }).toList();
+        } else {
+          // Fallback: derive from offer passenger types (no names)
+          passengers = offer.passengers.asMap().entries.map((e) {
+            final type = e.value.type;
+            final label = type == 'adult'
+                ? 'Adult ${e.key + 1}'
+                : type == 'child'
+                    ? 'Child ${e.key + 1}'
+                    : 'Infant ${e.key + 1}';
+            return PassengerSummary(name: label, type: type);
+          }).toList();
+        }
+
+        // ── Time helpers
+        String fmtTime(String iso) {
+          try {
+            final dt = DateTime.parse(iso).toLocal();
+            final h = dt.hour.toString().padLeft(2, '0');
+            final m = dt.minute.toString().padLeft(2, '0');
+            final ampm = dt.hour < 12 ? 'AM' : 'PM';
+            final h12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+            return '$h12:${m.padLeft(2, '0')} $ampm';
+          } catch (_) {
+            return iso;
+          }
+        }
+
+        String fmtDate(String iso) {
+          try {
+            final dt = DateTime.parse(iso).toLocal();
+            const months = [
+              '',
+              'Jan',
+              'Feb',
+              'Mar',
+              'Apr',
+              'May',
+              'Jun',
+              'Jul',
+              'Aug',
+              'Sep',
+              'Oct',
+              'Nov',
+              'Dec'
+            ];
+            return '${months[dt.month]} ${dt.day}, ${dt.year}';
+          } catch (_) {
+            return iso;
+          }
+        }
+
+        final slice = offer.outbound;
+        final depTime = slice.segments.isNotEmpty
+            ? fmtTime(slice.segments.first.departingAt)
+            : '—';
+        final arrTime = slice.segments.isNotEmpty
+            ? fmtTime(slice.segments.last.arrivingAt)
+            : '—';
+        final depDate = slice.segments.isNotEmpty
+            ? fmtDate(slice.segments.first.departingAt)
+            : '';
+
+        final paxCount = passengers.length;
+        final paxLabel = paxCount == 1 ? '1 Adult' : '$paxCount Adults';
+
+        return BookingItem.fromFlightBooking(
+          bookingId: booking?.bookingId ?? '',
+          baseAmount: pricing.baseAmount,
+          taxAmount: pricing.taxAmount,
+          // serviceFee: 15.00,
+          currency: pricing.totalCurrency,
+          flightTitle:
+              '${offer.airline}  ${slice.origin.iataCode} → ${slice.destination.iataCode}',
+          flightSubtitle: '$depDate  ·  $paxLabel  ·  ${offer.cabinClass}',
+          departureTime: depTime,
+          arrivalTime: arrTime,
+          duffelOfferId: offer.offerId,
+          passengers: passengers,
+        );
+      } catch (e) {
+        // Casting failed — show demo so screen isn't blank
+        return _demoBooking;
+      }
+    }
+
     return _demoBooking;
   }
 
@@ -142,8 +261,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                     child: SlideTransition(
                       position: _slideUp,
                       child: SingleChildScrollView(
-                        padding:
-                            const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -210,8 +328,8 @@ class _PaymentScreenState extends State<PaymentScreen>
               _FullOverlay(
                 child: PaymentSuccessState(
                   result: ctrl.lastResult!,
-                  onContinue: () => _navigateToSuccess(context, booking,
-                      ctrl.lastResult!),
+                  onContinue: () =>
+                      _navigateToSuccess(context, booking, ctrl.lastResult!),
                 ),
               ),
 
@@ -250,8 +368,8 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   // ── Header ─────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(BuildContext context, bool isDark,
-      ThemeController tc, PaymentController ctrl) {
+  Widget _buildHeader(BuildContext context, bool isDark, ThemeController tc,
+      PaymentController ctrl) {
     return Container(
       decoration: BoxDecoration(
         gradient: isDark
@@ -378,7 +496,8 @@ class _PaymentScreenState extends State<PaymentScreen>
                   boxShadow: isActive
                       ? [
                           BoxShadow(
-                            color: AppColors.primaryStart.withValues(alpha: 0.3),
+                            color:
+                                AppColors.primaryStart.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           )
@@ -402,9 +521,8 @@ class _PaymentScreenState extends State<PaymentScreen>
                       _tabs[i].label,
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight: isActive
-                            ? FontWeight.w700
-                            : FontWeight.w400,
+                        fontWeight:
+                            isActive ? FontWeight.w700 : FontWeight.w400,
                         color: isActive
                             ? Colors.white
                             : (isDark
@@ -463,8 +581,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  border: Border.all(
-                      color: AppColors.primaryStart, width: 1.5),
+                  border: Border.all(color: AppColors.primaryStart, width: 1.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.add_rounded,
@@ -506,8 +623,9 @@ class _PaymentScreenState extends State<PaymentScreen>
     final description = isDuffel
         ? 'Tap "Confirm & Pay" to complete your booking directly through Duffel\'s secure payment system.'
         : 'Tap "Confirm & Pay" to open the Stripe-hosted payment sheet. Supports cards, Google Pay, and more.';
-    final methods =
-        isDuffel ? ['Visa', 'Mastercard', 'Amex'] : ['Visa', 'Mastercard', 'Google Pay', 'Amex'];
+    final methods = isDuffel
+        ? ['Visa', 'Mastercard', 'Amex']
+        : ['Visa', 'Mastercard', 'Google Pay', 'Amex'];
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -533,8 +651,8 @@ class _PaymentScreenState extends State<PaymentScreen>
                 ),
               ],
             ),
-            child:
-                const Icon(Icons.payment_rounded, color: Colors.white, size: 30),
+            child: const Icon(Icons.payment_rounded,
+                color: Colors.white, size: 30),
           ),
           const SizedBox(height: 16),
           Text(
@@ -567,14 +685,13 @@ class _PaymentScreenState extends State<PaymentScreen>
             children: methods
                 .map(
                   (m) => Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppColors.primaryStart.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color:
-                              AppColors.primaryStart.withValues(alpha: 0.2)),
+                          color: AppColors.primaryStart.withValues(alpha: 0.2)),
                     ),
                     child: Text(
                       m,
@@ -709,8 +826,8 @@ class _PaymentScreenState extends State<PaymentScreen>
     if (_selectedMethod == 1) {
       if (_cardFormKey.currentState == null ||
           !_cardFormKey.currentState!.validate()) {
-        _showSnackbar(
-            context, 'Please fill in all card details correctly.', isError: true);
+        _showSnackbar(context, 'Please fill in all card details correctly.',
+            isError: true);
         return;
       }
     }
@@ -746,9 +863,8 @@ class _PaymentScreenState extends State<PaymentScreen>
         style: TextStyle(
           fontSize: AppSizes.fontMD,
           fontWeight: FontWeight.w700,
-          color: isDark
-              ? AppColors.darkTextPrimary
-              : AppColors.lightTextPrimary,
+          color:
+              isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
         ),
       );
 
@@ -786,8 +902,7 @@ class _PaymentScreenState extends State<PaymentScreen>
         ),
         backgroundColor: isError ? AppColors.error : AppColors.primaryStart,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -804,8 +919,7 @@ class _FullOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color:
-          (isDark ? AppColors.darkBackground : AppColors.lightBackground),
+      color: (isDark ? AppColors.darkBackground : AppColors.lightBackground),
       child: SafeArea(child: child),
     );
   }

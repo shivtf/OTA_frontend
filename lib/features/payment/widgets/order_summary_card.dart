@@ -25,12 +25,12 @@ class OrderSummaryCard extends StatelessWidget {
         boxShadow: isDark
             ? null
             : [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ],
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                )
+              ],
       ),
       child: Column(
         children: [
@@ -107,30 +107,29 @@ class OrderSummaryCard extends StatelessWidget {
                   children: [
                     Expanded(
                         child: _DetailItem(
-                          label: booking.detail1Label,
-                          value: booking.detail1Value,
-                          isDark: isDark,
-                        )),
+                      label: booking.detail1Label,
+                      value: booking.detail1Value,
+                      isDark: isDark,
+                    )),
                     Container(
                       width: 1,
                       height: 36,
-                      color: isDark
-                          ? AppColors.darkBorder
-                          : AppColors.lightBorder,
+                      color:
+                          isDark ? AppColors.darkBorder : AppColors.lightBorder,
                     ),
                     Expanded(
                         child: _DetailItem(
-                          label: booking.detail2Label,
-                          value: booking.detail2Value,
-                          isDark: isDark,
-                        )),
+                      label: booking.detail2Label,
+                      value: booking.detail2Value,
+                      isDark: isDark,
+                    )),
                   ],
                 ),
 
                 const SizedBox(height: 14),
                 Divider(
                     color:
-                    isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                        isDark ? AppColors.darkBorder : AppColors.lightBorder),
                 const SizedBox(height: 14),
 
                 // Price breakdown
@@ -144,14 +143,14 @@ class OrderSummaryCard extends StatelessWidget {
                     amount: booking.taxAmount,
                     isDark: isDark),
                 const SizedBox(height: 6),
-                _PriceLine(
-                    label: 'Service fee',
-                    amount: booking.serviceFee,
-                    isDark: isDark),
+                // _PriceLine(
+                //     label: 'Service fee',
+                //     amount: booking.serviceFee,
+                //     isDark: isDark),
                 const SizedBox(height: 12),
                 Divider(
                     color:
-                    isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                        isDark ? AppColors.darkBorder : AppColors.lightBorder),
                 const SizedBox(height: 12),
 
                 // Total
@@ -256,9 +255,8 @@ class _PriceLine extends StatelessWidget {
           style: TextStyle(
             fontSize: AppSizes.fontSM,
             fontWeight: FontWeight.w600,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
+            color:
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
           ),
         ),
       ],

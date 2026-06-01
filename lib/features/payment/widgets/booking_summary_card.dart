@@ -299,9 +299,8 @@ class _BookingSummaryCardState extends State<BookingSummaryCard>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.darkInputBg
-                        : AppColors.lightInputBg,
+                    color:
+                        isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -362,13 +361,13 @@ class _BookingSummaryCardState extends State<BookingSummaryCard>
           isSubtle: true,
         ),
         const SizedBox(height: 7),
-        _PriceLine(
-          label: 'Service fee',
-          value: b.serviceFee,
-          currency: b.currency,
-          isDark: isDark,
-          isSubtle: true,
-        ),
+        // _PriceLine(
+        //   label: 'Service fee',
+        //   // value: b.serviceFee,
+        //   currency: b.currency,
+        //   isDark: isDark,
+        //   isSubtle: true,
+        // ),
         const SizedBox(height: 12),
         Divider(
           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
@@ -390,8 +389,7 @@ class _BookingSummaryCardState extends State<BookingSummaryCard>
             ),
             const Spacer(),
             ShaderMask(
-              shaderCallback: (b) =>
-                  AppColors.primaryGradient.createShader(b),
+              shaderCallback: (b) => AppColors.primaryGradient.createShader(b),
               child: Text(
                 _formatCurrency(b.total, b.currency),
                 style: const TextStyle(
@@ -470,9 +468,8 @@ class _DetailCell extends StatelessWidget {
           style: TextStyle(
             fontSize: AppSizes.fontSM,
             fontWeight: FontWeight.w700,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
+            color:
+                isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
           ),
           textAlign: TextAlign.center,
         ),
