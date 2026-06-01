@@ -1,4 +1,9 @@
 // lib/app.dart
+//
+// Root widget. Registers all ChangeNotifier providers including
+// PaymentController — which auto-selects the active payment provider
+// from AppConfig.paymentGateway.
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +16,7 @@ import 'core/network/api_client.dart';
 
 import 'features/auth/providers/auth_provider.dart';
 import 'features/flights/providers/flight_booking_provider.dart';
+import 'features/payment/controllers/payment_controller.dart'; // ← NEW
 
 class WanderlyApp extends StatefulWidget {
   final AuthProvider authProvider;
@@ -45,16 +51,14 @@ class _WanderlyAppState extends State<WanderlyApp> {
     if (uri.host != 'auth') return;
 
     if (uri.path == '/verified') {
-      // backward compat for any old links already sent
       final status = uri.queryParameters['status'] ?? 'error';
       final message = uri.queryParameters['message'] ?? 'Verification failed.';
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
-            (route) => false,
+        (route) => false,
         arguments: {'status': status, 'message': message},
       );
     } else if (uri.path == '/verify') {
-      // new flow: deep link from email → app calls API → shows result screen
       final token = uri.queryParameters['token'] ?? '';
       _verifyTokenAndNavigate(token);
     }
@@ -68,13 +72,13 @@ class _WanderlyAppState extends State<WanderlyApp> {
       );
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
-            (route) => false,
+        (route) => false,
         arguments: {'status': 'success'},
       );
     } catch (_) {
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
-            (route) => false,
+        (route) => false,
         arguments: {
           'status': 'error',
           'message': 'Verification failed. The link may have expired.',
@@ -96,6 +100,10 @@ class _WanderlyAppState extends State<WanderlyApp> {
         ChangeNotifierProvider(create: (_) => ThemeController()),
         ChangeNotifierProvider.value(value: widget.authProvider),
         ChangeNotifierProvider(create: (_) => FlightBookingProvider()),
+        // ── PaymentController: auto-selects provider from AppConfig ─────────
+        // Changing AppConfig.paymentGateway is the ONLY required change
+        // to switch payment providers in production.
+        ChangeNotifierProvider(create: (_) => PaymentController()),
       ],
       child: Consumer<ThemeController>(
         builder: (context, themeController, child) {

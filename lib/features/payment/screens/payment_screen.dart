@@ -1,15 +1,37 @@
 // lib/features/payment/screens/payment_screen.dart
+//
+// Production-ready Payment Screen for Wanderly OTA.
+//
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  This file is 100% payment-provider-agnostic.                   ║
+// ║  Switching from Stripe → Duffel requires ONLY:                   ║
+// ║                                                                  ║
+// ║    AppConfig.paymentGateway = PaymentGateway.duffel;             ║
+// ║                                                                  ║
+// ║  No UI changes. No business logic changes. No screen rewrite.   ║
+// ╚══════════════════════════════════════════════════════════════════╝
+//
+// Displays:
+//   • Booking Summary   — flight info, passenger details
+//   • Price Breakdown   — base, taxes, fees, total
+//   • Payment Methods   — saved cards, new card, provider sheet
+//   • Payment Status    — loading / success / failure / retry
+//   • Confirm & Pay     — single CTA button
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/custom_back_button.dart';
+import '../controllers/payment_controller.dart';
 import '../models/payment_model.dart';
-import '../models/stripe_service.dart';
+import '../models/payment_result.dart';
+import '../widgets/booking_summary_card.dart';
 import '../widgets/card_from_widget.dart';
-import '../widgets/order_summary_card.dart';
+import '../widgets/payment_status_overlay.dart';
 import '../widgets/saved_card_title.dart';
 
 class PaymentScreen extends StatefulWidget {
@@ -21,19 +43,20 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen>
     with SingleTickerProviderStateMixin {
-  // Payment method selection
-  int _selectedMethod = 0; // 0=saved, 1=new card, 2=stripe sheet
+
+  // ── Payment method selection ─────────────────────────────────────────────
+  // 0 = saved cards  |  1 = new card  |  2 = provider sheet
+  int _selectedMethod = 0;
   String? _selectedCardId;
-  PaymentStatus _status = PaymentStatus.idle;
 
-  // Tab animation
-  late AnimationController _tabAnim;
-
-  // Card form key
+  // ── UI state ─────────────────────────────────────────────────────────────
+  late AnimationController _entranceAnim;
+  late Animation<double> _fadeIn;
+  late Animation<Offset> _slideUp;
   final _cardFormKey = GlobalKey<CardFormWidgetState>();
 
-  // Dummy booking (in real app, passed via route arguments)
-  final BookingItem _booking = const BookingItem(
+  // ── Fallback booking (used only if no route arguments provided) ──────────
+  static const BookingItem _demoBooking = BookingItem(
     type: BookingType.flight,
     title: 'Emirates  DEL → DXB',
     subtitle: 'Jun 15, 2025  ·  1 Adult  ·  Economy',
@@ -45,116 +68,198 @@ class _PaymentScreenState extends State<PaymentScreen>
     taxAmount: 65.04,
     serviceFee: 15.00,
     emoji: '✈️',
+    bookingId: 'demo-booking-001',
+    currency: 'USD',
+    passengers: [
+      PassengerSummary(name: 'John Traveler', type: 'adult'),
+    ],
   );
 
-  final List<Map<String, dynamic>> _paymentMethods = [
-    {'icon': Icons.credit_card_rounded, 'label': 'Saved Cards'},
-    {'icon': Icons.add_card_rounded, 'label': 'New Card'},
-    {'icon': Icons.payment_rounded, 'label': 'Stripe Pay'},
+  final List<_PaymentMethodTab> _tabs = const [
+    _PaymentMethodTab(icon: Icons.credit_card_rounded, label: 'Saved'),
+    _PaymentMethodTab(icon: Icons.add_card_rounded, label: 'New Card'),
+    _PaymentMethodTab(icon: Icons.payment_rounded, label: 'Pay Sheet'),
   ];
 
   @override
   void initState() {
     super.initState();
     _selectedCardId = dummySavedCards.first.id;
-    _tabAnim = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 300));
-    _tabAnim.forward();
+
+    // Entrance animation
+    _entranceAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fadeIn = CurvedAnimation(parent: _entranceAnim, curve: Curves.easeOut);
+    _slideUp = Tween<Offset>(
+      begin: const Offset(0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _entranceAnim, curve: Curves.easeOut));
+
+    // Initialise the payment controller (idempotent)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PaymentController>().initialize();
+      _entranceAnim.forward();
+    });
   }
 
   @override
   void dispose() {
-    _tabAnim.dispose();
+    _entranceAnim.dispose();
     super.dispose();
   }
 
-  // Use route arguments if passed
-  BookingItem _getBooking(BuildContext context) {
+  BookingItem _booking(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is BookingItem) return args;
-    return _booking;
+    return _demoBooking;
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final tc = context.watch<ThemeController>();
-    final booking = _getBooking(context);
+    final ctrl = context.watch<PaymentController>();
+    final booking = _booking(context);
+    final screenState = ctrl.screenState;
 
     return Scaffold(
       backgroundColor:
-      isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildHeader(context, isDark, tc),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Order summary
-                    OrderSummaryCard(booking: booking, isDark: isDark),
-                    const SizedBox(height: 24),
+            // ── Main scrollable content ────────────────────────────────
+            Column(
+              children: [
+                _buildHeader(context, isDark, tc, ctrl),
+                Expanded(
+                  child: FadeTransition(
+                    opacity: _fadeIn,
+                    child: SlideTransition(
+                      position: _slideUp,
+                      child: SingleChildScrollView(
+                        padding:
+                            const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Booking summary card
+                            BookingSummaryCard(
+                              booking: booking,
+                              isDark: isDark,
+                            ),
+                            const SizedBox(height: 24),
 
-                    // Secure payment badge
-                    _buildSecureBadge(isDark),
-                    const SizedBox(height: 20),
+                            // Security badge (provider-aware label)
+                            _buildSecurityBadge(ctrl, isDark),
+                            const SizedBox(height: 20),
 
-                    // Payment method tabs
-                    _buildMethodTabs(isDark),
-                    const SizedBox(height: 20),
+                            // Payment method tabs
+                            _buildMethodTabs(isDark),
+                            const SizedBox(height: 20),
 
-                    // Payment method content
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (child, anim) => FadeTransition(
-                        opacity: anim,
-                        child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0.05, 0),
-                            end: Offset.zero,
-                          ).animate(anim),
-                          child: child,
+                            // Payment method content
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, anim) =>
+                                  FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.04, 0),
+                                    end: Offset.zero,
+                                  ).animate(anim),
+                                  child: child,
+                                ),
+                              ),
+                              child: KeyedSubtree(
+                                key: ValueKey(_selectedMethod),
+                                child: _buildMethodContent(
+                                    isDark, ctrl.providerName),
+                              ),
+                            ),
+
+                            const SizedBox(height: 28),
+
+                            // Confirm & Pay button
+                            _buildPayButton(context, booking, ctrl, isDark),
+                            const SizedBox(height: 14),
+
+                            // Security footer note
+                            _buildSecurityFooter(isDark),
+                            const SizedBox(height: 40),
+                          ],
                         ),
                       ),
-                      child: KeyedSubtree(
-                        key: ValueKey(_selectedMethod),
-                        child: _buildMethodContent(isDark),
-                      ),
                     ),
+                  ),
+                ),
+              ],
+            ),
 
-                    const SizedBox(height: 28),
+            // ── Status overlays (sit above the content) ────────────────
+            if (screenState == PaymentScreenState.processing)
+              PaymentProcessingOverlay(providerName: ctrl.providerName),
 
-                    // Pay button
-                    _buildPayButton(context, booking, isDark),
-
-                    const SizedBox(height: 16),
-
-                    // Security note
-                    _buildSecurityNote(isDark),
-                    const SizedBox(height: 32),
-                  ],
+            if (screenState == PaymentScreenState.success &&
+                ctrl.lastResult != null)
+              _FullOverlay(
+                child: PaymentSuccessState(
+                  result: ctrl.lastResult!,
+                  onContinue: () => _navigateToSuccess(context, booking,
+                      ctrl.lastResult!),
                 ),
               ),
-            ),
+
+            if (screenState == PaymentScreenState.failure &&
+                ctrl.lastResult != null)
+              _FullOverlay(
+                child: PaymentFailureState(
+                  result: ctrl.lastResult!,
+                  retryCount: ctrl.retryCount,
+                  maxRetries: 3,
+                  onRetry: ctrl.canRetry
+                      ? () => _doRetry(context, booking, ctrl)
+                      : null,
+                  onBack: () {
+                    ctrl.reset();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+
+            if (screenState == PaymentScreenState.cancelled)
+              _FullOverlay(
+                child: PaymentCancelledState(
+                  onTryAgain: () => ctrl.reset(),
+                  onBack: () {
+                    ctrl.reset();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(
-      BuildContext context, bool isDark, ThemeController tc) {
+  // ── Header ─────────────────────────────────────────────────────────────
+
+  Widget _buildHeader(BuildContext context, bool isDark,
+      ThemeController tc, PaymentController ctrl) {
     return Container(
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        )
+                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
             : AppColors.primaryGradient,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(28),
@@ -170,33 +275,36 @@ class _PaymentScreenState extends State<PaymentScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Checkout',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: AppSizes.fontXXL,
-                      fontWeight: FontWeight.w800,
-                    )),
-                Text('Complete your payment securely',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: AppSizes.fontSM,
-                    )),
+                Text(
+                  'Checkout',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: AppSizes.fontXXL,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  'Review and confirm your booking',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: AppSizes.fontSM,
+                  ),
+                ),
               ],
             ),
           ),
+          // Theme toggle
           GestureDetector(
             onTap: tc.toggleTheme,
             child: Container(
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha:0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                isDark
-                    ? Icons.light_mode_rounded
-                    : Icons.dark_mode_rounded,
+                isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
                 color: Colors.white,
                 size: 18,
               ),
@@ -207,14 +315,20 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
   }
 
-  Widget _buildSecureBadge(bool isDark) {
+  // ── Security badge ──────────────────────────────────────────────────────
+
+  Widget _buildSecurityBadge(PaymentController ctrl, bool isDark) {
+    final provider = ctrl.providerName;
+    final label = provider == 'duffel'
+        ? 'Secured by Duffel  ·  PCI DSS compliant  ·  256-bit SSL'
+        : 'Secured by Stripe  ·  256-bit SSL encryption  ·  PCI DSS compliant';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha:0.08),
+        color: AppColors.success.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border:
-        Border.all(color: AppColors.success.withValues(alpha:0.25)),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -223,7 +337,7 @@ class _PaymentScreenState extends State<PaymentScreen>
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Secured by Stripe  ·  256-bit SSL encryption  ·  PCI DSS compliant',
+              label,
               style: TextStyle(
                 fontSize: AppSizes.fontXS,
                 color: isDark
@@ -238,6 +352,8 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
   }
 
+  // ── Method tabs ─────────────────────────────────────────────────────────
+
   Widget _buildMethodTabs(bool isDark) {
     return Container(
       height: 48,
@@ -249,7 +365,7 @@ class _PaymentScreenState extends State<PaymentScreen>
             color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
       ),
       child: Row(
-        children: List.generate(_paymentMethods.length, (i) {
+        children: List.generate(_tabs.length, (i) {
           final isActive = _selectedMethod == i;
           return Expanded(
             child: GestureDetector(
@@ -261,29 +377,29 @@ class _PaymentScreenState extends State<PaymentScreen>
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: isActive
                       ? [
-                    BoxShadow(
-                      color: AppColors.primaryStart.withValues(alpha:0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    )
-                  ]
+                          BoxShadow(
+                            color: AppColors.primaryStart.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          )
+                        ]
                       : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      _paymentMethods[i]['icon'] as IconData,
-                      size: 15,
+                      _tabs[i].icon,
+                      size: 14,
                       color: isActive
                           ? Colors.white
                           : (isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary),
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary),
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      _paymentMethods[i]['label'] as String,
+                      _tabs[i].label,
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: isActive
@@ -292,8 +408,8 @@ class _PaymentScreenState extends State<PaymentScreen>
                         color: isActive
                             ? Colors.white
                             : (isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary),
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary),
                       ),
                     ),
                   ],
@@ -306,14 +422,16 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
   }
 
-  Widget _buildMethodContent(bool isDark) {
+  // ── Method content ──────────────────────────────────────────────────────
+
+  Widget _buildMethodContent(bool isDark, String providerName) {
     switch (_selectedMethod) {
       case 0:
         return _buildSavedCards(isDark);
       case 1:
         return _buildNewCardForm(isDark);
       case 2:
-        return _buildStripeSheet(isDark);
+        return _buildProviderSheet(isDark, providerName);
       default:
         return const SizedBox.shrink();
     }
@@ -323,26 +441,19 @@ class _PaymentScreenState extends State<PaymentScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Your Saved Cards',
-          style: TextStyle(
-            fontSize: AppSizes.fontMD,
-            fontWeight: FontWeight.w700,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
+        _sectionTitle('Your Saved Cards', isDark),
+        const SizedBox(height: 12),
+        ...dummySavedCards.map(
+          (card) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SavedCardTile(
+              card: card,
+              isSelected: _selectedCardId == card.id,
+              isDark: isDark,
+              onTap: () => setState(() => _selectedCardId = card.id),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        ...dummySavedCards.map((card) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: SavedCardTile(
-            card: card,
-            isSelected: _selectedCardId == card.id,
-            isDark: isDark,
-            onTap: () => setState(() => _selectedCardId = card.id),
-          ),
-        )),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: () => setState(() => _selectedMethod = 1),
@@ -379,26 +490,25 @@ class _PaymentScreenState extends State<PaymentScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Enter Card Details',
-          style: TextStyle(
-            fontSize: AppSizes.fontMD,
-            fontWeight: FontWeight.w700,
-            color: isDark
-                ? AppColors.darkTextPrimary
-                : AppColors.lightTextPrimary,
-          ),
-        ),
+        _sectionTitle('Enter Card Details', isDark),
         const SizedBox(height: 12),
-        CardFormWidget(
-          formKey: _cardFormKey,
-          isDark: isDark,
-        ),
+        CardFormWidget(formKey: _cardFormKey, isDark: isDark),
       ],
     );
   }
 
-  Widget _buildStripeSheet(bool isDark) {
+  /// Provider-aware payment sheet panel.
+  /// The text adapts to Stripe vs Duffel, but the layout is identical.
+  Widget _buildProviderSheet(bool isDark, String providerName) {
+    final isDuffel = providerName == 'duffel';
+
+    final title = isDuffel ? 'Duffel Secure Payment' : 'Stripe Payment Sheet';
+    final description = isDuffel
+        ? 'Tap "Confirm & Pay" to complete your booking directly through Duffel\'s secure payment system.'
+        : 'Tap "Confirm & Pay" to open the Stripe-hosted payment sheet. Supports cards, Google Pay, and more.';
+    final methods =
+        isDuffel ? ['Visa', 'Mastercard', 'Amex'] : ['Visa', 'Mastercard', 'Google Pay', 'Amex'];
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -417,18 +527,18 @@ class _PaymentScreenState extends State<PaymentScreen>
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primaryStart.withValues(alpha:0.35),
+                  color: AppColors.primaryStart.withValues(alpha: 0.35),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
-                )
+                ),
               ],
             ),
-            child: const Icon(Icons.payment_rounded,
-                color: Colors.white, size: 30),
+            child:
+                const Icon(Icons.payment_rounded, color: Colors.white, size: 30),
           ),
           const SizedBox(height: 16),
           Text(
-            'Stripe Payment Sheet',
+            title,
             style: TextStyle(
               fontSize: AppSizes.fontLG,
               fontWeight: FontWeight.w700,
@@ -439,7 +549,7 @@ class _PaymentScreenState extends State<PaymentScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Tap "Pay Now" below to open the Stripe-hosted payment sheet. Supports cards, Google Pay, and more.',
+            description,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: AppSizes.fontSM,
@@ -450,28 +560,32 @@ class _PaymentScreenState extends State<PaymentScreen>
             ),
           ),
           const SizedBox(height: 16),
-          // Supported methods chips
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
-            children: ['Visa', 'Mastercard', 'Google Pay', 'Amex']
-                .map((m) => Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primaryStart.withValues(alpha:0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: AppColors.primaryStart.withValues(alpha:0.2)),
-              ),
-              child: Text(m,
-                  style: const TextStyle(
-                    fontSize: AppSizes.fontSM,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryStart,
-                  )),
-            ))
+            children: methods
+                .map(
+                  (m) => Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryStart.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color:
+                              AppColors.primaryStart.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      m,
+                      style: const TextStyle(
+                        fontSize: AppSizes.fontSM,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryStart,
+                      ),
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ],
@@ -479,18 +593,19 @@ class _PaymentScreenState extends State<PaymentScreen>
     );
   }
 
-  Widget _buildPayButton(
-      BuildContext context, BookingItem booking, bool isDark) {
-    final isProcessing = _status == PaymentStatus.processing;
+  // ── Pay button ───────────────────────────────────────────────────────────
+
+  Widget _buildPayButton(BuildContext context, BookingItem booking,
+      PaymentController ctrl, bool isDark) {
+    final isProcessing = ctrl.isProcessing;
 
     return GestureDetector(
-      onTap: isProcessing ? null : () => _handlePayment(context, booking),
+      onTap: isProcessing ? null : () => _handlePayment(context, booking, ctrl),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         height: AppSizes.buttonHeight,
         decoration: BoxDecoration(
-          gradient:
-          isProcessing ? null : AppColors.primaryGradient,
+          gradient: isProcessing ? null : AppColors.primaryGradient,
           color: isProcessing
               ? (isDark ? AppColors.darkCard : AppColors.lightInputBg)
               : null,
@@ -498,73 +613,77 @@ class _PaymentScreenState extends State<PaymentScreen>
           boxShadow: isProcessing
               ? null
               : [
-            BoxShadow(
-              color: AppColors.primaryStart.withValues(alpha:0.45),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-              spreadRadius: -4,
-            ),
-          ],
+                  BoxShadow(
+                    color: AppColors.primaryStart.withValues(alpha: 0.45),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                    spreadRadius: -4,
+                  ),
+                ],
         ),
         child: Center(
           child: isProcessing
               ? Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.primaryStart,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Processing payment...',
-                style: TextStyle(
-                  fontSize: AppSizes.fontMD,
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary,
-                ),
-              ),
-            ],
-          )
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.primaryStart,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Processing...',
+                      style: TextStyle(
+                        fontSize: AppSizes.fontMD,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                )
               : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.lock_rounded,
-                  color: Colors.white, size: 18),
-              const SizedBox(width: 10),
-              Text(
-                'Pay  \$${booking.total.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: AppSizes.fontLG,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 0.3,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.lock_rounded,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Confirm & Pay  ${_formatTotal(booking)}',
+                      style: const TextStyle(
+                        fontSize: AppSizes.fontLG,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildSecurityNote(bool isDark) {
+  // ── Security footer ──────────────────────────────────────────────────────
+
+  Widget _buildSecurityFooter(bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.shield_rounded,
-            size: 13,
-            color: isDark
-                ? AppColors.darkTextSecondary
-                : AppColors.lightTextSecondary),
+        Icon(
+          Icons.shield_rounded,
+          size: 13,
+          color: isDark
+              ? AppColors.darkTextSecondary
+              : AppColors.lightTextSecondary,
+        ),
         const SizedBox(width: 5),
         Text(
           'Your payment info is never stored on our servers',
@@ -582,64 +701,120 @@ class _PaymentScreenState extends State<PaymentScreen>
   // ── Payment logic ─────────────────────────────────────────────────────────
 
   Future<void> _handlePayment(
-      BuildContext context, BookingItem booking) async {
-    // Validate new card form if selected
+    BuildContext context,
+    BookingItem booking,
+    PaymentController ctrl,
+  ) async {
+    // Validate new-card form if that tab is active
     if (_selectedMethod == 1) {
       if (_cardFormKey.currentState == null ||
           !_cardFormKey.currentState!.validate()) {
-        _showError(context, 'Please fill in all card details correctly.');
+        _showSnackbar(
+            context, 'Please fill in all card details correctly.', isError: true);
         return;
       }
     }
 
-    setState(() => _status = PaymentStatus.processing);
-
-    bool success = false;
-
-    if (_selectedMethod == 2) {
-      // Stripe payment sheet flow
-      success = await StripeService.instance.processPayment(
-        amount: booking.total,
-        currency: 'usd',
-        customerEmail: 'traveler@wanderly.app',
-        description: booking.title,
-      );
-    } else {
-      // Simulate card payment processing
-      await Future.delayed(const Duration(milliseconds: 2200));
-      success = true; // always succeed in demo
-    }
-
-    if (!mounted) return;
-
-    setState(() => _status =
-    success ? PaymentStatus.success : PaymentStatus.failed);
-
-    if (success) {
-      Navigator.of(context).pushReplacementNamed(
-        AppRoutes.paymentSuccess,
-        arguments: booking,
-      );
-    } else {
-      setState(() => _status = PaymentStatus.idle);
-      _showError(context, 'Payment failed. Please try again.');
-    }
+    await ctrl.processPayment(booking: booking);
+    // The PaymentController notifies listeners → overlay drives UI.
+    // Navigation to success screen is handled inside the overlay widget.
   }
 
-  void _showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.error_rounded, color: Colors.white, size: 18),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Text(message,
+  Future<void> _doRetry(
+    BuildContext context,
+    BookingItem booking,
+    PaymentController ctrl,
+  ) async {
+    await ctrl.retry(booking: booking);
+  }
+
+  void _navigateToSuccess(
+      BuildContext context, BookingItem booking, PaymentResult result) {
+    Navigator.of(context).pushReplacementNamed(
+      AppRoutes.paymentSuccess,
+      arguments: {
+        'booking': booking,
+        'result': result,
+      },
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  Widget _sectionTitle(String text, bool isDark) => Text(
+        text,
+        style: TextStyle(
+          fontSize: AppSizes.fontMD,
+          fontWeight: FontWeight.w700,
+          color: isDark
+              ? AppColors.darkTextPrimary
+              : AppColors.lightTextPrimary,
+        ),
+      );
+
+  String _formatTotal(BookingItem b) {
+    final symbol = b.currency.toUpperCase() == 'USD'
+        ? '\$'
+        : b.currency.toUpperCase() == 'EUR'
+            ? '€'
+            : b.currency.toUpperCase() == 'GBP'
+                ? '£'
+                : '${b.currency.toUpperCase()} ';
+    return '$symbol${b.total.toStringAsFixed(2)}';
+  }
+
+  void _showSnackbar(BuildContext context, String message,
+      {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_rounded : Icons.info_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
                 style: const TextStyle(
-                    fontWeight: FontWeight.w600, color: Colors.white))),
-      ]),
-      backgroundColor: AppColors.error,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-    ));
+                    fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: isError ? AppColors.error : AppColors.primaryStart,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
+}
+
+// ── Full-screen overlay container ─────────────────────────────────────────────
+
+class _FullOverlay extends StatelessWidget {
+  final Widget child;
+  const _FullOverlay({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      color:
+          (isDark ? AppColors.darkBackground : AppColors.lightBackground),
+      child: SafeArea(child: child),
+    );
+  }
+}
+
+// ── Data class ────────────────────────────────────────────────────────────────
+
+class _PaymentMethodTab {
+  final IconData icon;
+  final String label;
+  const _PaymentMethodTab({required this.icon, required this.label});
 }
