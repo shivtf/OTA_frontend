@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -6,7 +7,6 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/routes/app_routes.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/responsive.dart';
-import '../../../shared/widgets/custom_back_button.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_divider.dart';
 import '../widgets/auth_header.dart';
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       Navigator.of(context).pushNamedAndRemoveUntil(
         AppRoutes.home,
-        (_) => false,
+            (_) => false,
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -101,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: padding),
@@ -111,12 +111,9 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: AppSizes.paddingMD),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const CustomBackButton(),
-                    _ThemeToggle(controller: themeController, isDark: isDark),
-                  ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _ThemeToggle(controller: themeController, isDark: isDark),
                 ),
                 const SizedBox(height: AppSizes.paddingXL),
                 Center(
