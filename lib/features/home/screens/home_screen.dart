@@ -9,7 +9,6 @@ import '../../../features/flights/models/flight_model.dart';
 import '../../../shared/widgets/wanderly_nav_bar.dart';
 import '../widgets/deal_card.dart';
 import '../widgets/destination_card.dart';
-import '../widgets/home_search_bar.dart';
 import '../../home/widgets/quick_category_row.dart';
 import '../../profiles/screens/profile_screen.dart';
 import '../../profiles/screens/my_bookings_screen.dart';
@@ -83,12 +82,6 @@ class _HomeTab extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(child: _HomeHeader(isDark: isDark, tc: tc)),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: HomeSearchBar(isDark: isDark),
-          ),
-        ),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),

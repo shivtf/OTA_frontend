@@ -355,7 +355,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
         color: surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+            color: Colors.black.withValues(alpha:isDark ? 0.3 : 0.06),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -477,7 +477,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                             ? Colors.transparent
                             : isAssigned
                                 ? _seatAssignedBorderColor
-                                : AppColors.lightTextSecondary.withOpacity(0.3),
+                                : AppColors.lightTextSecondary.withValues(alpha:0.3),
                         width: 1.5,
                       ),
                     ),
@@ -610,7 +610,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.event_seat_rounded,
-                size: 64, color: AppColors.lightTextSecondary.withOpacity(0.4)),
+                size: 64, color: AppColors.lightTextSecondary.withValues(alpha:0.4)),
             const SizedBox(height: 16),
             const Text('Seat map not available\nfor this flight',
                 textAlign: TextAlign.center,
@@ -703,7 +703,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
   Widget _buildRow(_RowData row, int rowIndex, bool isWingRow, bool isDark) {
     return Container(
       color: isWingRow
-          ? AppColors.primaryStart.withOpacity(isDark ? 0.05 : 0.03)
+          ? AppColors.primaryStart.withValues(alpha:isDark ? 0.05 : 0.03)
           : Colors.transparent,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -713,7 +713,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             width: 24,
             child: isWingRow
                 ? Icon(Icons.airplanemode_active_rounded,
-                    size: 14, color: AppColors.primaryStart.withOpacity(0.4))
+                    size: 14, color: AppColors.primaryStart.withValues(alpha:0.4))
                 : null,
           ),
           ...row.sections.map((section) {
@@ -729,7 +729,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             width: 24,
             child: isWingRow
                 ? Icon(Icons.airplanemode_active_rounded,
-                    size: 14, color: AppColors.primaryStart.withOpacity(0.4))
+                    size: 14, color: AppColors.primaryStart.withValues(alpha:0.4))
                 : null,
           ),
         ],
@@ -752,8 +752,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
 
     if (!seat.isAvailable) {
       seatColor = _seatOccupiedColor;
-      borderColor = _seatOccupiedColor.withOpacity(0.6);
-      iconColor = Colors.white.withOpacity(0.5);
+      borderColor = _seatOccupiedColor.withValues(alpha:0.6);
+      iconColor = Colors.white.withValues(alpha:0.5);
     } else if (isOwnedByActive) {
       // Active passenger's current seat
       seatColor = _seatActiveColor;
@@ -773,13 +773,13 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
       );
     } else if (seat.isExitRow) {
-      seatColor = _seatExitColor.withOpacity(0.15);
+      seatColor = _seatExitColor.withValues(alpha:0.15);
       borderColor = _seatExitColor;
       iconColor = _seatExitColor;
     } else {
       seatColor = isDark
-          ? _seatAvailableColor.withOpacity(0.15)
-          : _seatAvailableColor.withOpacity(0.1);
+          ? _seatAvailableColor.withValues(alpha:0.15)
+          : _seatAvailableColor..withValues(alpha:0.1);
       borderColor = _seatAvailableColor;
       iconColor = _seatAvailableColor;
     }
@@ -799,7 +799,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
           boxShadow: (isOwnedByActive || isOwnedByOther)
               ? [
                   BoxShadow(
-                    color: borderColor.withOpacity(0.4),
+                    color: borderColor.withValues(alpha:0.4),
                     blurRadius: 8,
                     spreadRadius: 1,
                   )
@@ -826,7 +826,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                   color: (isOwnedByActive || isOwnedByOther)
                       ? Colors.white
                       : !seat.isAvailable
-                          ? Colors.white.withOpacity(0.5)
+                          ? Colors.white.withValues(alpha:0.5)
                           : iconColor,
                   fontSize: 7,
                   fontWeight: FontWeight.w600,
@@ -861,7 +861,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
         color: surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+            color: Colors.black.withValues(alpha:isDark ? 0.3 : 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -956,7 +956,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.primaryStart.withOpacity(0.08),
+                color: AppColors.primaryStart.withValues(alpha:0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1047,7 +1047,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryStart.withOpacity(0.35),
+                            color: AppColors.primaryStart.withValues(alpha:0.35),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -1238,7 +1238,7 @@ class _PlaneNosePainter extends CustomPainter {
         const Radius.circular(4),
       ),
       Paint()
-        ..color = AppColors.primaryStart.withOpacity(0.2)
+        ..color = AppColors.primaryStart.withValues(alpha:0.2)
         ..style = PaintingStyle.fill,
     );
   }

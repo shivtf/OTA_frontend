@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -173,10 +172,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: auth.isLoading ? null : _onLogin,
                 ),
                 const SizedBox(height: AppSizes.paddingXL),
-                const AuthDivider(text: AppStrings.orContinueWith),
-                const SizedBox(height: AppSizes.paddingLG),
-                SocialLoginButton(onPressed: () {}),
-                const SizedBox(height: AppSizes.paddingXXL),
+                // const AuthDivider(text: AppStrings.orContinueWith),
+                // const SizedBox(height: AppSizes.paddingLG),
+                // SocialLoginButton(onPressed: () {}),
+                // const SizedBox(height: AppSizes.paddingXXL),
                 Center(
                   child: _BottomAuthLink(
                     text: AppStrings.noAccount,

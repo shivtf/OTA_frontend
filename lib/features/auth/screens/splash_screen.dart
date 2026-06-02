@@ -27,6 +27,45 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _launchController;
   bool _isLaunching = false;
 
+  // ── Language support ────────────────────────────────────────────────────────
+  static const List<Map<String, String>> _languages = [
+    {'code': 'en',    'label': 'English (US)', 'flag': '🇺🇸'},
+    {'code': 'en_GB', 'label': 'English (UK)', 'flag': '🇬🇧'},
+    {'code': 'ar',    'label': 'العربية',       'flag': '🇸🇦'},
+    {'code': 'fr',    'label': 'Français',      'flag': '🇫🇷'},
+    {'code': 'de',    'label': 'Deutsch',       'flag': '🇩🇪'},
+    {'code': 'es',    'label': 'Español',       'flag': '🇪🇸'},
+    {'code': 'hi',    'label': 'हिन्दी',          'flag': '🇮🇳'},
+    {'code': 'zh',    'label': '中文',           'flag': '🇨🇳'},
+    {'code': 'ja',    'label': '日本語',         'flag': '🇯🇵'},
+    {'code': 'pt',    'label': 'Português',     'flag': '🇧🇷'},
+  ];
+
+  String _selectedLangCode = 'en';
+
+  String get _selectedLangLabel =>
+      _languages.firstWhere((l) => l['code'] == _selectedLangCode)['label']!;
+  String get _selectedLangFlag =>
+      _languages.firstWhere((l) => l['code'] == _selectedLangCode)['flag']!;
+
+  void _showLanguagePicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _LanguagePickerSheet(
+        languages: _languages,
+        selectedCode: _selectedLangCode,
+        isDark: isDark,
+        onSelect: (code) {
+          setState(() => _selectedLangCode = code);
+          // TODO: wire to your localisation / locale provider
+        },
+      ),
+    );
+  }
+
   final GlobalKey _planeKey = GlobalKey();
   Offset _planeCenter = Offset.zero;
 
@@ -128,7 +167,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (_isLaunching) return;
 
     final renderBox =
-        _planeKey.currentContext?.findRenderObject() as RenderBox?;
+    _planeKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null) {
       final pos = renderBox.localToGlobal(Offset.zero);
       final size = renderBox.size;
@@ -143,7 +182,7 @@ class _SplashScreenState extends State<SplashScreen>
     final auth = context.read<AuthProvider>();
     Navigator.of(context).pushNamedAndRemoveUntil(
       auth.isLoggedIn ? AppRoutes.home : AppRoutes.login,
-      (_) => false,
+          (_) => false,
     );
   }
 
@@ -183,9 +222,9 @@ class _SplashScreenState extends State<SplashScreen>
                 final curve = Curves.easeInQuart.transform(t);
                 final planeY = _planeCenter.dy - curve * screenH * 1.15;
                 final trailOpacity =
-                    (t < 0.85 ? 1.0 : (1.0 - t) / 0.15).clamp(0.0, 1.0);
+                (t < 0.85 ? 1.0 : (1.0 - t) / 0.15).clamp(0.0, 1.0);
                 final trailLength =
-                    (_planeCenter.dy - planeY).clamp(0.0, screenH);
+                (_planeCenter.dy - planeY).clamp(0.0, screenH);
 
                 return Stack(
                   children: [
@@ -226,27 +265,27 @@ class _SplashScreenState extends State<SplashScreen>
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-                colors: [
-                  Color(0xFF060411),
-                  Color(0xFF110B2E),
-                  Color(0xFF2A1466),
-                  Color(0xFF6C3CE1),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0.0, 0.3, 0.65, 1.0],
-              )
+          colors: [
+            Color(0xFF060411),
+            Color(0xFF110B2E),
+            Color(0xFF2A1466),
+            Color(0xFF6C3CE1),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: [0.0, 0.3, 0.65, 1.0],
+        )
             : const LinearGradient(
-                colors: [
-                  Color(0xFF1A0A4E),
-                  Color(0xFF3D1FA0),
-                  Color(0xFF6C3CE1),
-                  Color(0xFF9B5CFF),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0.0, 0.3, 0.7, 1.0],
-              ),
+          colors: [
+            Color(0xFF1A0A4E),
+            Color(0xFF3D1FA0),
+            Color(0xFF6C3CE1),
+            Color(0xFF9B5CFF),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: [0.0, 0.3, 0.7, 1.0],
+        ),
       ),
     );
   }
@@ -317,20 +356,39 @@ class _SplashScreenState extends State<SplashScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppSizes.radiusCircle),
-              border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25), width: 1),
-            ),
-            child: const Text(
-              AppStrings.languageSelector,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: AppSizes.fontSM,
-                fontWeight: FontWeight.w500,
+          GestureDetector(
+            onTap: _showLanguagePicker,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppSizes.radiusCircle),
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25), width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _selectedLangFlag,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _selectedLangLabel,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: AppSizes.fontSM,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ],
               ),
             ),
           ),
@@ -451,7 +509,7 @@ class _SplashScreenState extends State<SplashScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
             _pages.length,
-            (dotIndex) => GestureDetector(
+                (dotIndex) => GestureDetector(
               onTap: () {
                 _autoAdvanceTimer?.cancel();
                 _pageController.animateToPage(
@@ -485,7 +543,7 @@ class _SplashScreenState extends State<SplashScreen>
             onPageChanged: (i) => setState(() => _currentPage = i),
             itemBuilder: (context, i) => Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: AppSizes.paddingXXL),
+              const EdgeInsets.symmetric(horizontal: AppSizes.paddingXXL),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
@@ -572,6 +630,157 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Language Picker Sheet ─────────────────────────────────────────────────────
+
+class _LanguagePickerSheet extends StatelessWidget {
+  final List<Map<String, String>> languages;
+  final String selectedCode;
+  final bool isDark;
+  final ValueChanged<String> onSelect;
+
+  const _LanguagePickerSheet({
+    required this.languages,
+    required this.selectedCode,
+    required this.isDark,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1635) : Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.07),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.12),
+            blurRadius: 32,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Title
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            child: Row(
+              children: [
+                const Icon(Icons.language_rounded,
+                    color: Color(0xFF6C3CE1), size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  'Select Language',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF1A1635),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.07)
+                : Colors.black.withValues(alpha: 0.06),
+          ),
+          // Language list
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: languages.length,
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                indent: 20,
+                endIndent: 20,
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.04),
+              ),
+              itemBuilder: (ctx, i) {
+                final lang = languages[i];
+                final isSelected = lang['code'] == selectedCode;
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    onSelect(lang['code']!);
+                    Navigator.of(context).pop();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    color: isSelected
+                        ? const Color(0xFF6C3CE1).withValues(alpha: 0.08)
+                        : Colors.transparent,
+                    child: Row(
+                      children: [
+                        Text(
+                          lang['flag']!,
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            lang['label']!,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? const Color(0xFF6C3CE1)
+                                  : (isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1A1635)),
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            color: Color(0xFF6C3CE1),
+                            size: 20,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );
