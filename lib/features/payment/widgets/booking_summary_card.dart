@@ -314,8 +314,8 @@ class _BookingSummaryCardState extends State<BookingSummaryCard>
                     ),
                   ),
                 ),
-                if (p.seatNumber != null) ...[
-                  const SizedBox(width: 6),
+                if (p.seatNumber != null)
+                  // Chosen seat — show seat number in brand color
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -325,16 +325,31 @@ class _BookingSummaryCardState extends State<BookingSummaryCard>
                       border: Border.all(
                           color: AppColors.primaryStart.withValues(alpha: 0.2)),
                     ),
-                    child: Text(
-                      p.seatNumber!,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryStart,
-                      ),
+                    child: Text(p.seatNumber!,
+                        style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryStart)),
+                  )
+                else
+                  // No seat chosen — show "Random seat" in muted style
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.darkInputBg
+                          : AppColors.lightInputBg,
+                      borderRadius: BorderRadius.circular(6),
                     ),
+                    child: Text('Random seat',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary)),
                   ),
-                ],
               ],
             ),
           ),
@@ -347,58 +362,57 @@ class _BookingSummaryCardState extends State<BookingSummaryCard>
     return Column(
       children: [
         _PriceLine(
-          label: 'Base fare',
-          value: b.basePrice,
-          currency: b.currency,
-          isDark: isDark,
-        ),
+            label: 'Base fare',
+            value: b.basePrice,
+            currency: b.currency,
+            isDark: isDark),
         const SizedBox(height: 7),
         _PriceLine(
-          label: 'Taxes & fees',
-          value: b.taxAmount,
-          currency: b.currency,
-          isDark: isDark,
-          isSubtle: true,
-        ),
-        const SizedBox(height: 7),
-        // _PriceLine(
-        //   label: 'Service fee',
-        //   // value: b.serviceFee,
-        //   currency: b.currency,
-        //   isDark: isDark,
-        //   isSubtle: true,
-        // ),
+            label: 'Taxes & fees',
+            value: b.taxAmount,
+            currency: b.currency,
+            isDark: isDark,
+            isSubtle: true),
+
+        // ── Seat upgrade line — only shown when seats were selected ──
+        if (b.seatFee > 0) ...[
+          const SizedBox(height: 7),
+          _PriceLine(
+            label: 'Seat selection',
+            value: b.seatFee,
+            currency: b.currency,
+            isDark: isDark,
+            isSubtle: true,
+            // give it an accent color so it's visually distinct
+            accentColor: AppColors.primaryStart,
+          ),
+        ],
+
         const SizedBox(height: 12),
         Divider(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          height: 1,
-        ),
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            height: 1),
         const SizedBox(height: 12),
-        // Total row
+        // Total row — unchanged, b.total already includes seatFee
         Row(
           children: [
-            Text(
-              'Total Amount',
-              style: TextStyle(
-                fontSize: AppSizes.fontMD,
-                fontWeight: FontWeight.w800,
-                color: isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary,
-              ),
-            ),
+            Text('Total Amount',
+                style: TextStyle(
+                  fontSize: AppSizes.fontMD,
+                  fontWeight: FontWeight.w800,
+                  color: isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightTextPrimary,
+                )),
             const Spacer(),
             ShaderMask(
               shaderCallback: (b) => AppColors.primaryGradient.createShader(b),
-              child: Text(
-                _formatCurrency(b.total, b.currency),
-                style: const TextStyle(
-                  fontSize: AppSizes.fontXXL,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
-              ),
+              child: Text(_formatCurrency(b.total, b.currency),
+                  style: const TextStyle(
+                      fontSize: AppSizes.fontXXL,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -0.5)),
             ),
           ],
         ),
@@ -484,6 +498,7 @@ class _PriceLine extends StatelessWidget {
   final String currency;
   final bool isDark;
   final bool isSubtle;
+  final Color? accentColor;
 
   const _PriceLine({
     required this.label,
@@ -491,6 +506,7 @@ class _PriceLine extends StatelessWidget {
     required this.currency,
     required this.isDark,
     this.isSubtle = false,
+    this.accentColor,
   });
 
   @override
@@ -503,19 +519,22 @@ class _PriceLine extends StatelessWidget {
                 ? '£'
                 : '${currency.toUpperCase()} ';
 
+    final color = accentColor ??
+        (isSubtle
+            ? (isDark
+                ? AppColors.darkTextSecondary
+                : AppColors.lightTextSecondary)
+            : (isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary));
+
     return Row(
       children: [
         Text(
           label,
           style: TextStyle(
             fontSize: AppSizes.fontSM,
-            color: isSubtle
-                ? (isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary)
-                : (isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary),
+            color: color,
           ),
         ),
         const Spacer(),
@@ -524,13 +543,7 @@ class _PriceLine extends StatelessWidget {
           style: TextStyle(
             fontSize: AppSizes.fontSM,
             fontWeight: FontWeight.w600,
-            color: isSubtle
-                ? (isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary)
-                : (isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary),
+            color: color,
           ),
         ),
       ],

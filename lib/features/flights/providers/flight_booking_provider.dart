@@ -11,9 +11,9 @@ enum BookingStep {
   offersDone,
   passengerDetails,
   initiatingBooking,
-  bookingPending, // has bookingId, awaiting payment
+  bookingPending,
   initiatingPayment,
-  awaitingStripe, // sessionUrl opened, waiting for user to return
+  awaitingStripe,
   confirmingPayment,
   confirmed,
   failed,
@@ -38,16 +38,17 @@ class FlightBookingProvider extends ChangeNotifier {
   FlightBooking? _currentBooking;
   List<PassengerInput> _passengers = [];
 
-  // Seat selection — service IDs chosen on the seat map screen (one per passenger).
-  // Persisted here so they survive navigation to the payment screen and are
-  // sent to the backend when confirming the Duffel order.
-  List<String> _selectedSeatServiceIds = [];
+  // Seat selection — full rich data from seat map screen.
+  // Each entry: { passengerIndex, serviceId, designator, amount, currency }
+  // Stored here so it survives navigation and is sent to the backend
+  // at payment initiation time (NOT at booking init time).
+  List<Map<String, dynamic>> _seatSelections = [];
 
   // Payment state
   PaymentSession? _paymentSession;
   PaymentConfirmResult? _confirmResult;
 
-  // Getters
+  // ── Getters ──────────────────────────────────────────────────────
   BookingStep get step => _step;
   String? get error => _error;
   String? get offerRequestId => _offerRequestId;
@@ -57,8 +58,18 @@ class FlightBookingProvider extends ChangeNotifier {
   FlightBooking? get currentBooking => _currentBooking;
   PaymentSession? get paymentSession => _paymentSession;
   PaymentConfirmResult? get confirmResult => _confirmResult;
-  List<String> get selectedSeatServiceIds =>
-      List.unmodifiable(_selectedSeatServiceIds);
+
+  /// Full rich seat selection data — each entry has passengerIndex,
+  /// serviceId, designator, amount, currency.
+  List<Map<String, dynamic>> get seatSelections =>
+      List.unmodifiable(_seatSelections);
+
+  /// Total extra cost across all selected seats (0.0 if none selected).
+  double get seatUpgradeTotal => _seatSelections.fold(
+        0.0,
+        (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0),
+      );
+
   bool get isLoading =>
       _step == BookingStep.searching ||
       _step == BookingStep.loadingOffers ||
@@ -142,10 +153,19 @@ class FlightBookingProvider extends ChangeNotifier {
     }
   }
 
-  /// Called by the seat map screen after the user confirms their seat choices.
-  /// [serviceIds] is the list of Duffel service IDs returned via Navigator.pop().
-  void setSeatServices(List<String> serviceIds) {
-    _selectedSeatServiceIds = List<String>.from(serviceIds);
+  // ── Seat selection ───────────────────────────────────────────────
+
+  /// Called by the seat map screen after the user confirms seat choices.
+  /// [selections] is the rich result from Navigator.pop() — each entry has:
+  /// { passengerIndex, serviceId, designator, amount, currency }
+  void setSeatSelections(List<Map<String, dynamic>> selections) {
+    _seatSelections = List.from(selections);
+    notifyListeners();
+  }
+
+  /// Clears all seat selections (e.g. user taps "Skip" on seat map).
+  void clearSeatSelections() {
+    _seatSelections = [];
     notifyListeners();
   }
 
@@ -156,9 +176,6 @@ class FlightBookingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sets the selected offer without calling notifyListeners().
-  /// Use this when you need to set the offer mid-submit to avoid
-  /// triggering a widget rebuild that could interrupt navigation.
   void setOfferSilently(FlightOffer offer) {
     _selectedOffer = offer;
     _step = BookingStep.passengerDetails;
@@ -166,6 +183,9 @@ class FlightBookingProvider extends ChangeNotifier {
   }
 
   // ── Step 3: Init Booking ─────────────────────────────────────────
+  // Note: seat selections are NOT sent here anymore.
+  // They are sent at payment initiation time so the correct total
+  // is charged. Sending them here served no backend purpose.
   Future<bool> initBooking({
     required List<PassengerInput> passengers,
     String tripType = 'ONE_WAY',
@@ -182,7 +202,7 @@ class FlightBookingProvider extends ChangeNotifier {
         offerId: _selectedOffer!.offerId,
         passengers: passengers,
         tripType: tripType,
-        selectedSeatServiceIds: _selectedSeatServiceIds,
+        // No seat services here — sent at initiatePayment instead
       );
       _step = BookingStep.bookingPending;
       notifyListeners();
@@ -200,7 +220,11 @@ class FlightBookingProvider extends ChangeNotifier {
     }
   }
 
-  // ── Step 4: Initiate Payment → get Stripe URL ────────────────────
+  // ── Step 4: Initiate Payment ─────────────────────────────────────
+  // Sends seat selections so the backend can:
+  //   1. Persist them to flight_booking.selected_services
+  //   2. Add seat cost to total_amount before charging
+  //   3. Return a pricing breakdown for the UI
   Future<bool> initiatePayment() async {
     if (_currentBooking == null) return false;
 
@@ -211,6 +235,7 @@ class FlightBookingProvider extends ChangeNotifier {
     try {
       _paymentSession = await _paymentService.initiatePayment(
         _currentBooking!.bookingId,
+        selectedServices: _seatSelections, // ← seat selections sent here
       );
       _step = BookingStep.awaitingStripe;
       notifyListeners();
@@ -228,7 +253,9 @@ class FlightBookingProvider extends ChangeNotifier {
     }
   }
 
-  // ── Step 5: Confirm Payment (called after Stripe redirect) ───────
+  // ── Step 5: Confirm Payment ──────────────────────────────────────
+  // selectedServices are read by the backend from DB (saved at initiate time).
+  // No need to re-send them here.
   Future<bool> confirmPayment({required String sessionId}) async {
     if (_currentBooking == null) return false;
 
@@ -240,7 +267,6 @@ class FlightBookingProvider extends ChangeNotifier {
       _confirmResult = await _paymentService.confirmPayment(
         bookingId: _currentBooking!.bookingId,
         sessionId: sessionId,
-        selectedSeatServiceIds: _selectedSeatServiceIds,
       );
       _step = BookingStep.confirmed;
       notifyListeners();
@@ -267,7 +293,7 @@ class FlightBookingProvider extends ChangeNotifier {
     _selectedOffer = null;
     _currentBooking = null;
     _passengers = [];
-    _selectedSeatServiceIds = [];
+    _seatSelections = []; // ← was _selectedSeatServiceIds
     _paymentSession = null;
     _confirmResult = null;
     notifyListeners();

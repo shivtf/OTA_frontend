@@ -186,9 +186,8 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
             'booking': provider.currentBooking,
             'offer': _offer,
             'passengers': passengers,
-            // Seat service IDs selected on the seat map screen. May be empty
-            // if the user skipped seat selection — that is fine.
-            'selectedSeatServiceIds': provider.selectedSeatServiceIds,
+            'seatSelections':
+                provider.seatSelections, // ← correct key + rich data
           },
         );
       } else {

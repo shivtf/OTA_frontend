@@ -34,7 +34,8 @@ class StripePaymentProvider implements PaymentProvider {
     Stripe.publishableKey = _publishableKey;
     Stripe.merchantIdentifier = 'wanderly.app';
     await Stripe.instance.applySettings();
-    debugPrint('[StripeProvider] Initialized (key: ${_publishableKey.substring(0, 12)}...)');
+    debugPrint(
+        '[StripeProvider] Initialized (key: ${_publishableKey.substring(0, 12)}...)');
   }
 
   // ── Core payment flow ─────────────────────────────────────────────────────
@@ -48,7 +49,12 @@ class StripePaymentProvider implements PaymentProvider {
   }) async {
     try {
       // Step 1 — Get PaymentIntent client secret from your backend
-      final clientSecret = await _initiatePayment(bookingId: bookingId);
+      final rawServices =
+          metadata['selectedServices'] as List<Map<String, dynamic>>? ?? [];
+      final clientSecret = await _initiatePayment(
+        bookingId: bookingId,
+        selectedServices: rawServices,
+      );
       if (clientSecret == null || clientSecret.isEmpty) {
         return PaymentResult.failure(
           errorMessage: 'Unable to start payment. Please try again.',
@@ -115,7 +121,8 @@ class StripePaymentProvider implements PaymentProvider {
         return PaymentResult.cancelled(providerName: providerName);
       }
       return PaymentResult.failure(
-        errorMessage: e.error.localizedMessage ?? 'Payment failed. Please try again.',
+        errorMessage:
+            e.error.localizedMessage ?? 'Payment failed. Please try again.',
         errorCode: e.error.code.toString(),
         providerName: providerName,
       );
@@ -136,14 +143,25 @@ class StripePaymentProvider implements PaymentProvider {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  Future<String?> _initiatePayment({required String bookingId}) async {
-    final res = await ApiClient.instance.post(
-      '/payments/initiate',
-      {'bookingId': bookingId},
-      auth: true,
-    );
+  Future<String?> _initiatePayment({
+    required String bookingId,
+    List<Map<String, dynamic>> selectedServices = const [],
+  }) async {
+    final body = <String, dynamic>{'bookingId': bookingId};
+    if (selectedServices.isNotEmpty) {
+      body['selectedServices'] = selectedServices
+          .map((s) => {
+                'id': s['serviceId'],
+                'total_amount': s['amount']?.toString(),
+                'total_currency': s['currency'] ?? 'USD',
+              })
+          .toList();
+    }
+    final res =
+        await ApiClient.instance.post('/payments/initiate', body, auth: true);
     final data = res['data'] as Map<String, dynamic>?;
-    return data?['clientSecret'] as String?;
+    return data?['clientSecret']
+        as String?; // Stripe returns sessionUrl not clientSecret
   }
 
   Future<void> _confirmPayment({required String bookingId}) async {
@@ -156,7 +174,8 @@ class StripePaymentProvider implements PaymentProvider {
 
   String _friendlyApiError(ApiException e) {
     if (e.isUnauthorized) return 'Session expired. Please log in again.';
-    if (e.statusCode >= 500) return 'Our servers are having trouble. Please try again.';
+    if (e.statusCode >= 500)
+      return 'Our servers are having trouble. Please try again.';
     return e.message.isNotEmpty
         ? e.message
         : 'Payment request failed. Please try again.';

@@ -32,6 +32,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
   bool _isLoading = true;
   String? _error;
   SeatMapResult? _seatMapResult;
+  bool _seatMapUnavailable = false;
 
   // ── Multi-passenger seat assignment ───────────────────────────────────────
   // _assignments[passengerIndex] = _SelectedSeat | null
@@ -88,7 +89,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     } else if (_offerId.isEmpty) {
       setState(() {
         _isLoading = false;
-        _seatMapResult = _buildMockSeatMap();
+        _seatMapUnavailable = true;
       });
       _animController.forward();
     }
@@ -100,115 +101,21 @@ class _SeatMapScreenState extends State<SeatMapScreen>
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _seatMapResult = (!result.available || result.seatMaps.isEmpty)
-            ? _buildMockSeatMap()
-            : result;
+        if (!result.available || result.seatMaps.isEmpty) {
+          _seatMapUnavailable = true; // ← flag it, don't use mock
+        } else {
+          _seatMapResult = result;
+        }
       });
       _animController.forward();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _seatMapResult = _buildMockSeatMap();
+        _seatMapUnavailable = true; // ← flag it, don't use mock
       });
       _animController.forward();
     }
-  }
-
-  // ── Mock data ──────────────────────────────────────────────────────────────
-
-  SeatMapResult _buildMockSeatMap() =>
-      SeatMapResult(available: true, seatMaps: [_mockSegment()]);
-
-  Map<String, dynamic> _mockSegment() {
-    final cabins = <Map<String, dynamic>>[];
-
-    // Business — rows 1–4, 2-2 layout
-    final bizRows = <Map<String, dynamic>>[];
-    for (int row = 1; row <= 4; row++) {
-      bizRows.add({
-        'sections': [
-          {
-            'elements': [
-              _mockSeat(row, 'A', row <= 2),
-              _mockSeat(row, 'B', row == 1)
-            ]
-          },
-          {
-            'elements': [
-              {'type': 'bassinet', 'designator': 'aisle'}
-            ]
-          },
-          {
-            'elements': [
-              _mockSeat(row, 'C', row == 2),
-              _mockSeat(row, 'D', false)
-            ]
-          },
-        ],
-      });
-    }
-    cabins.add({
-      'cabin_class': 'business',
-      'deck': 'main',
-      'rows': bizRows,
-      'wings': {'first_row_index': 99, 'last_row_index': 99},
-    });
-
-    // Economy — rows 10–35, 3-3 layout
-    final ecoRows = <Map<String, dynamic>>[];
-    for (int row = 10; row <= 35; row++) {
-      ecoRows.add({
-        'sections': [
-          {
-            'elements': [
-              _mockSeat(row, 'A', row % 5 == 0 || row % 7 == 2),
-              _mockSeat(row, 'B', row % 4 == 0),
-              _mockSeat(row, 'C', row % 6 == 0 || row % 3 == 1),
-            ],
-          },
-          {
-            'elements': [
-              {'type': 'bassinet', 'designator': 'aisle'}
-            ]
-          },
-          {
-            'elements': [
-              _mockSeat(row, 'D', row % 5 == 1),
-              _mockSeat(row, 'E', row % 4 == 2 || row % 7 == 0),
-              _mockSeat(row, 'F', row % 6 == 3),
-            ],
-          },
-        ],
-      });
-    }
-    cabins.add({
-      'cabin_class': 'economy',
-      'deck': 'main',
-      'rows': ecoRows,
-      'wings': {'first_row_index': 8, 'last_row_index': 18},
-    });
-
-    return {'cabins': cabins, 'slice_id': 'slc_mock'};
-  }
-
-  Map<String, dynamic> _mockSeat(int row, String col, bool isOccupied) {
-    final id = 'svc_${row}_$col';
-    return {
-      'type': 'seat',
-      'designator': '$row$col',
-      'available_services': isOccupied
-          ? []
-          : [
-              {
-                'id': id,
-                'total_amount':
-                    '${(15 + (row < 10 ? 80 : 0)).toStringAsFixed(2)}',
-                'total_currency': 'USD',
-              }
-            ],
-      'disclosures': [],
-    };
   }
 
   // ── Parsed cabins ──────────────────────────────────────────────────────────
@@ -300,19 +207,24 @@ class _SeatMapScreenState extends State<SeatMapScreen>
       backgroundColor: bg,
       body: _isLoading
           ? _buildLoading(bg)
-          : FadeTransition(
-              opacity: _fadeAnim,
-              child: Column(
-                children: [
-                  _buildAppBar(context, isDark, textPri, surface),
-                  _buildPassengerSelector(isDark, surface, textPri, textSec),
-                  _buildLegend(isDark),
-                  Expanded(
-                      child: _buildSeatMap(isDark, surface, textPri, textSec)),
-                  _buildBottomBar(context, isDark, surface, textPri, textSec),
-                ],
-              ),
-            ),
+          : _seatMapUnavailable // ← check flag before rendering seat map
+              ? _buildUnavailable()
+              : FadeTransition(
+                  opacity: _fadeAnim,
+                  child: Column(
+                    children: [
+                      _buildAppBar(context, isDark, textPri, surface),
+                      _buildPassengerSelector(
+                          isDark, surface, textPri, textSec),
+                      _buildLegend(isDark),
+                      Expanded(
+                          child:
+                              _buildSeatMap(isDark, surface, textPri, textSec)),
+                      _buildBottomBar(
+                          context, isDark, surface, textPri, textSec),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -355,7 +267,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
         color: surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:isDark ? 0.3 : 0.06),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -424,6 +336,47 @@ class _SeatMapScreenState extends State<SeatMapScreen>
     );
   }
 
+  Widget _buildUnavailable() {
+    return Scaffold(
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.darkBackground
+          : AppColors.lightBackground,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event_seat_rounded,
+                size: 64,
+                color: AppColors.lightTextSecondary.withValues(alpha: 0.4)),
+            const SizedBox(height: 16),
+            const Text(
+              'Seat map not available\nfor this flight',
+              textAlign: TextAlign.center,
+              style:
+                  TextStyle(color: AppColors.lightTextSecondary, fontSize: 15),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () => Navigator.pop(context, <String>[]),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [AppColors.primaryStart, AppColors.primaryEnd]),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text('Go Back',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Passenger selector tabs ────────────────────────────────────────────────
 
   Widget _buildPassengerSelector(
@@ -477,7 +430,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                             ? Colors.transparent
                             : isAssigned
                                 ? _seatAssignedBorderColor
-                                : AppColors.lightTextSecondary.withValues(alpha:0.3),
+                                : AppColors.lightTextSecondary
+                                    .withValues(alpha: 0.3),
                         width: 1.5,
                       ),
                     ),
@@ -610,7 +564,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.event_seat_rounded,
-                size: 64, color: AppColors.lightTextSecondary.withValues(alpha:0.4)),
+                size: 64,
+                color: AppColors.lightTextSecondary.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
             const Text('Seat map not available\nfor this flight',
                 textAlign: TextAlign.center,
@@ -703,7 +658,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
   Widget _buildRow(_RowData row, int rowIndex, bool isWingRow, bool isDark) {
     return Container(
       color: isWingRow
-          ? AppColors.primaryStart.withValues(alpha:isDark ? 0.05 : 0.03)
+          ? AppColors.primaryStart.withValues(alpha: isDark ? 0.05 : 0.03)
           : Colors.transparent,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -713,7 +668,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             width: 24,
             child: isWingRow
                 ? Icon(Icons.airplanemode_active_rounded,
-                    size: 14, color: AppColors.primaryStart.withValues(alpha:0.4))
+                    size: 14,
+                    color: AppColors.primaryStart.withValues(alpha: 0.4))
                 : null,
           ),
           ...row.sections.map((section) {
@@ -729,7 +685,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             width: 24,
             child: isWingRow
                 ? Icon(Icons.airplanemode_active_rounded,
-                    size: 14, color: AppColors.primaryStart.withValues(alpha:0.4))
+                    size: 14,
+                    color: AppColors.primaryStart.withValues(alpha: 0.4))
                 : null,
           ),
         ],
@@ -752,8 +709,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
 
     if (!seat.isAvailable) {
       seatColor = _seatOccupiedColor;
-      borderColor = _seatOccupiedColor.withValues(alpha:0.6);
-      iconColor = Colors.white.withValues(alpha:0.5);
+      borderColor = _seatOccupiedColor.withValues(alpha: 0.6);
+      iconColor = Colors.white.withValues(alpha: 0.5);
     } else if (isOwnedByActive) {
       // Active passenger's current seat
       seatColor = _seatActiveColor;
@@ -773,13 +730,14 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
       );
     } else if (seat.isExitRow) {
-      seatColor = _seatExitColor.withValues(alpha:0.15);
+      seatColor = _seatExitColor.withValues(alpha: 0.15);
       borderColor = _seatExitColor;
       iconColor = _seatExitColor;
     } else {
       seatColor = isDark
-          ? _seatAvailableColor.withValues(alpha:0.15)
-          : _seatAvailableColor..withValues(alpha:0.1);
+          ? _seatAvailableColor.withValues(alpha: 0.15)
+          : _seatAvailableColor
+        ..withValues(alpha: 0.1);
       borderColor = _seatAvailableColor;
       iconColor = _seatAvailableColor;
     }
@@ -799,7 +757,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
           boxShadow: (isOwnedByActive || isOwnedByOther)
               ? [
                   BoxShadow(
-                    color: borderColor.withValues(alpha:0.4),
+                    color: borderColor.withValues(alpha: 0.4),
                     blurRadius: 8,
                     spreadRadius: 1,
                   )
@@ -826,7 +784,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                   color: (isOwnedByActive || isOwnedByOther)
                       ? Colors.white
                       : !seat.isAvailable
-                          ? Colors.white.withValues(alpha:0.5)
+                          ? Colors.white.withValues(alpha: 0.5)
                           : iconColor,
                   fontSize: 7,
                   fontWeight: FontWeight.w600,
@@ -861,7 +819,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
         color: surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:isDark ? 0.3 : 0.08),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -956,7 +914,7 @@ class _SeatMapScreenState extends State<SeatMapScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.primaryStart.withValues(alpha:0.08),
+                color: AppColors.primaryStart.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1056,7 +1014,8 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryStart.withValues(alpha:0.35),
+                            color:
+                                AppColors.primaryStart.withValues(alpha: 0.35),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -1255,7 +1214,7 @@ class _PlaneNosePainter extends CustomPainter {
         const Radius.circular(4),
       ),
       Paint()
-        ..color = AppColors.primaryStart.withValues(alpha:0.2)
+        ..color = AppColors.primaryStart.withValues(alpha: 0.2)
         ..style = PaintingStyle.fill,
     );
   }

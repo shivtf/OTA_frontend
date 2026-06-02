@@ -6,13 +6,26 @@ class PaymentService {
   // ── POST /payments/initiate ─────────────────────────────────────
   /// Returns Stripe checkout session URL to open in browser
   /// Response: { provider, sessionId, sessionUrl, publishableKey }
-  Future<PaymentSession> initiatePayment(String bookingId) async {
-    final res = await _client.post(
-        '/payments/initiate',
-        {
-          'bookingId': bookingId,
-        },
-        auth: true);
+  Future<PaymentSession> initiatePayment(
+    String bookingId, {
+    List<Map<String, dynamic>> selectedServices = const [],
+  }) async {
+    final body = <String, dynamic>{'bookingId': bookingId};
+
+    if (selectedServices.isNotEmpty) {
+      // Send only what the backend needs: id, total_amount, total_currency
+      body['selectedServices'] = selectedServices
+          .map((s) => {
+                'id': s['serviceId'],
+                'total_amount': s['amount']?.toString(),
+                'total_currency': s['currency'] ?? 'USD',
+              })
+          .toList();
+    }
+
+    final res = await _client.post('/payments/initiate', body, auth: true);
+
+    // Backend now returns pricing breakdown — store it for UI use
     return PaymentSession.fromJson(res['data'] as Map<String, dynamic>);
   }
 
@@ -51,20 +64,35 @@ class PaymentSession {
   final String sessionId;
   final String sessionUrl;
   final String? publishableKey;
+  final double? baseFare; // ← new
+  final double? seatUpgrade; // ← new
+  final double? total; // ← new
+  final String? pricingCurrency; // ← new
 
   PaymentSession({
     required this.provider,
     required this.sessionId,
     required this.sessionUrl,
     this.publishableKey,
+    this.baseFare,
+    this.seatUpgrade,
+    this.total,
+    this.pricingCurrency,
   });
 
-  factory PaymentSession.fromJson(Map<String, dynamic> j) => PaymentSession(
-        provider: j['provider'] as String? ?? 'stripe',
-        sessionId: j['sessionId'] as String? ?? '',
-        sessionUrl: j['sessionUrl'] as String? ?? '',
-        publishableKey: j['publishableKey'] as String?,
-      );
+  factory PaymentSession.fromJson(Map<String, dynamic> j) {
+    final pricing = j['pricing'] as Map<String, dynamic>?;
+    return PaymentSession(
+      provider: j['provider'] as String? ?? 'stripe',
+      sessionId: j['sessionId'] as String? ?? '',
+      sessionUrl: j['sessionUrl'] as String? ?? '',
+      publishableKey: j['publishableKey'] as String?,
+      baseFare: (pricing?['baseFare'] as num?)?.toDouble(),
+      seatUpgrade: (pricing?['seatUpgrade'] as num?)?.toDouble(),
+      total: (pricing?['total'] as num?)?.toDouble(),
+      pricingCurrency: pricing?['currency'] as String?,
+    );
+  }
 }
 
 class PaymentConfirmResult {

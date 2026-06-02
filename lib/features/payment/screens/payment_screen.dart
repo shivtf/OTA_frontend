@@ -126,8 +126,13 @@ class _PaymentScreenState extends State<PaymentScreen>
         final dynamic rawPassengers =
             args['passengers']; // List<PassengerInput>
         // Fix Bug 3 & 4: seat selections forwarded from FlightDetailsScreen
-        final rawSeats = args['seatSelections'] as Map<dynamic, dynamic>? ?? {};
-
+        final rawSeats = args['seatSelections'];
+        final seatList = rawSeats is List
+            ? rawSeats
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+            : <Map<String, dynamic>>[];
         if (rawOffer == null) return _demoBooking;
 
         final FlightOffer offer = rawOffer as FlightOffer;
@@ -233,18 +238,18 @@ class _PaymentScreenState extends State<PaymentScreen>
 
         // Fix Bug 3 & 4: apply seat selections — adds seatFee and sets seatNumber
         // on each PassengerSummary so checkout shows seat per passenger.
-        if (rawSeats.isNotEmpty) {
-          final typedSeats = rawSeats.map((k, v) {
-            final dynamic val = v;
-            return MapEntry(
-              k as int,
-              (
-                designator: val.designator as String,
-                amount: val.amount as double,
-              ),
-            );
-          });
-          return baseItem.withSeats(typedSeats);
+        if (seatList.isNotEmpty) {
+          // Convert List<Map> → Map<passengerIndex, (designator, amount)>
+          final typedSeats = <int, ({String designator, double amount})>{};
+          for (final s in seatList) {
+            final idx = (s['passengerIndex'] as num?)?.toInt();
+            final designator = s['designator'] as String?;
+            final amount = (s['amount'] as num?)?.toDouble() ?? 0.0;
+            if (idx != null && designator != null) {
+              typedSeats[idx] = (designator: designator, amount: amount);
+            }
+          }
+          if (typedSeats.isNotEmpty) return baseItem.withSeats(typedSeats);
         }
         return baseItem;
       } catch (e) {

@@ -614,56 +614,71 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
 
   Widget _buildPriceBreakdown(FlightOffer offer, bool isDark) {
     final pricing = offer.pricing;
-    return _Section(
-      title: 'Price Breakdown',
-      isDark: isDark,
-      child: Column(
-        children: [
-          _PriceRow(
-              label: 'Base fare',
-              amount: pricing.baseAmount,
-              currency: pricing.totalCurrency,
-              isDark: isDark),
-          _PriceRow(
-              label: 'Taxes & fees',
-              amount: pricing.taxAmount,
-              currency: pricing.totalCurrency,
-              isDark: isDark),
-          if (pricing.totalEmissionsKg != null)
-            _Co2Row(kg: pricing.totalEmissionsKg!, isDark: isDark),
-          Divider(
-            height: 20,
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          ),
-          Row(
+    return Consumer<FlightBookingProvider>(
+      builder: (context, prov, _) {
+        final seatUpgrade = prov.seatUpgradeTotal;
+        final grandTotal = pricing.totalAmount + seatUpgrade;
+
+        return _Section(
+          title: 'Price Breakdown',
+          isDark: isDark,
+          child: Column(
             children: [
-              Text(
-                'Total',
-                style: TextStyle(
-                  fontSize: AppSizes.fontMD,
-                  fontWeight: FontWeight.w700,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightTextPrimary,
+              _PriceRow(
+                  label: 'Base fare',
+                  amount: pricing.baseAmount,
+                  currency: pricing.totalCurrency,
+                  isDark: isDark),
+              _PriceRow(
+                  label: 'Taxes & fees',
+                  amount: pricing.taxAmount,
+                  currency: pricing.totalCurrency,
+                  isDark: isDark),
+              // Seat upgrade line — only shown when seats are selected
+              if (seatUpgrade > 0)
+                _PriceRow(
+                  label: 'Seat selection',
+                  amount: seatUpgrade,
+                  currency: pricing.totalCurrency,
+                  isDark: isDark,
                 ),
+              if (pricing.totalEmissionsKg != null)
+                _Co2Row(kg: pricing.totalEmissionsKg!, isDark: isDark),
+              Divider(
+                height: 20,
+                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
               ),
-              const Spacer(),
-              ShaderMask(
-                shaderCallback: (b) =>
-                    AppColors.primaryGradient.createShader(b),
-                child: Text(
-                  '${pricing.totalCurrency} ${pricing.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: AppSizes.fontXXL,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
+              Row(
+                children: [
+                  Text(
+                    'Total',
+                    style: TextStyle(
+                      fontSize: AppSizes.fontMD,
+                      fontWeight: FontWeight.w700,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
+                    ),
                   ),
-                ),
+                  const Spacer(),
+                  ShaderMask(
+                    shaderCallback: (b) =>
+                        AppColors.primaryGradient.createShader(b),
+                    child: Text(
+                      '${pricing.totalCurrency} ${grandTotal.toStringAsFixed(2)}', // ← live
+                      style: const TextStyle(
+                        fontSize: AppSizes.fontXXL,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1124,9 +1139,9 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
         final flightInfo =
             '${slice.origin.iataCode} → ${slice.destination.iataCode}'
             ' · ${_formatDate(slice.departureAt)}';
-        // Build per-passenger display names for the seat map
+
         final passengerNames = offer.passengers.asMap().entries.map((e) {
-          final type = e.value.type; // adult | child | infant_without_seat
+          final type = e.value.type;
           final label = type == 'adult'
               ? 'Adult ${e.key + 1}'
               : type == 'child'
@@ -1135,11 +1150,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
           return label;
         }).toList();
 
-        // Pass the Duffel passenger IDs so the seat map can match the correct
-        // service entry per passenger per seat.
         final passengerDuffelIds = offer.passengers.map((p) => p.id).toList();
 
-        // ── Await the result — seat map returns List<String> of serviceIds ──
         final result = await Navigator.of(context).pushNamed(
           AppRoutes.seatMap,
           arguments: {
@@ -1154,12 +1166,16 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
 
         if (!context.mounted) return;
 
-        // Store the selected service IDs in the shared provider so the
-        // payment screen can send them to the backend on confirm.
         if (result is List && result.isNotEmpty) {
-          final serviceIds = result.cast<String>();
+          final selections = result
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+
+          if (selections.isEmpty) return;
+
           Provider.of<FlightBookingProvider>(context, listen: false)
-              .setSeatServices(serviceIds);
+              .setSeatSelections(selections);
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1169,7 +1185,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                       color: Colors.white, size: 18),
                   const SizedBox(width: 10),
                   Text(
-                    '${serviceIds.length} seat${serviceIds.length == 1 ? '' : 's'} selected',
+                    '${selections.length} seat${selections.length == 1 ? '' : 's'} selected',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ],
@@ -1186,15 +1202,15 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
       },
       icon: Consumer<FlightBookingProvider>(
         builder: (_, prov, __) => Icon(
-          prov.selectedSeatServiceIds.isNotEmpty
+          prov.seatSelections.isNotEmpty // ← was selectedSeatServiceIds
               ? Icons.event_seat_rounded
               : Icons.event_seat_outlined,
         ),
       ),
       label: Consumer<FlightBookingProvider>(
         builder: (_, prov, __) => Text(
-          prov.selectedSeatServiceIds.isNotEmpty
-              ? 'Seats Selected (${prov.selectedSeatServiceIds.length})'
+          prov.seatSelections.isNotEmpty // ← was selectedSeatServiceIds
+              ? 'Seats Selected (${prov.seatSelections.length})'
               : 'Select Seats',
         ),
       ),
@@ -1217,42 +1233,60 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
 
   Widget _buildBookButton(
       BuildContext context, FlightOffer offer, bool isDark) {
-    return Row(
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Consumer<FlightBookingProvider>(
+      builder: (context, prov, _) {
+        final seatUpgrade = prov.seatUpgradeTotal;
+        final total = offer.totalAmount + seatUpgrade;
+
+        return Row(
           children: [
-            Text(
-              'Total price',
-              style: TextStyle(
-                fontSize: AppSizes.fontSM,
-                color: isDark
-                    ? AppColors.darkTextSecondary
-                    : AppColors.lightTextSecondary,
-              ),
-            ),
-            ShaderMask(
-              shaderCallback: (b) => AppColors.primaryGradient.createShader(b),
-              child: Text(
-                '${offer.currency} ${offer.totalAmount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: AppSizes.fontXXL,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total price',
+                  style: TextStyle(
+                    fontSize: AppSizes.fontSM,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
                 ),
+                ShaderMask(
+                  shaderCallback: (b) =>
+                      AppColors.primaryGradient.createShader(b),
+                  child: Text(
+                    '${offer.currency} ${total.toStringAsFixed(2)}', // ← live total
+                    style: const TextStyle(
+                      fontSize: AppSizes.fontXXL,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // Show seat upgrade line when seats are selected
+                if (seatUpgrade > 0)
+                  Text(
+                    'incl. ${offer.currency} ${seatUpgrade.toStringAsFixed(2)} seat upgrade',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primaryStart,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: GradientButton(
+                text: 'Initialize Booking',
+                icon: Icons.person_add_rounded,
+                onPressed: () => _showPassengerForm(context, offer, isDark),
               ),
             ),
           ],
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: GradientButton(
-            text: 'Initialize Booking',
-            icon: Icons.person_add_rounded,
-            onPressed: () => _showPassengerForm(context, offer, isDark),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
