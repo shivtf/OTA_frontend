@@ -17,19 +17,24 @@ class PaymentService {
   }
 
   // ── POST /payments/confirm ──────────────────────────────────────
-  /// Confirms payment after user completes Stripe checkout
+  /// Confirms payment after user completes Stripe checkout.
+  /// [selectedSeatServiceIds] are passed as a safety fallback — the backend
+  /// also reads them from the DB (saved at init time), but sending them here
+  /// ensures they are used even if the DB write was delayed or missed.
   /// Response: { bookingId, bookingRef, status }
   Future<PaymentConfirmResult> confirmPayment({
     required String bookingId,
     required String sessionId,
+    List<String> selectedSeatServiceIds = const [],
   }) async {
-    final res = await _client.post(
-        '/payments/confirm',
-        {
-          'bookingId': bookingId,
-          'sessionId': sessionId,
-        },
-        auth: true);
+    final body = <String, dynamic>{
+      'bookingId': bookingId,
+      'sessionId': sessionId,
+    };
+    if (selectedSeatServiceIds.isNotEmpty) {
+      body['selectedServices'] = selectedSeatServiceIds;
+    }
+    final res = await _client.post('/payments/confirm', body, auth: true);
     return PaymentConfirmResult.fromJson(res['data'] as Map<String, dynamic>);
   }
 

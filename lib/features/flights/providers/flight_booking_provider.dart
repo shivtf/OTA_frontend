@@ -38,6 +38,11 @@ class FlightBookingProvider extends ChangeNotifier {
   FlightBooking? _currentBooking;
   List<PassengerInput> _passengers = [];
 
+  // Seat selection — service IDs chosen on the seat map screen (one per passenger).
+  // Persisted here so they survive navigation to the payment screen and are
+  // sent to the backend when confirming the Duffel order.
+  List<String> _selectedSeatServiceIds = [];
+
   // Payment state
   PaymentSession? _paymentSession;
   PaymentConfirmResult? _confirmResult;
@@ -52,12 +57,14 @@ class FlightBookingProvider extends ChangeNotifier {
   FlightBooking? get currentBooking => _currentBooking;
   PaymentSession? get paymentSession => _paymentSession;
   PaymentConfirmResult? get confirmResult => _confirmResult;
+  List<String> get selectedSeatServiceIds =>
+      List.unmodifiable(_selectedSeatServiceIds);
   bool get isLoading =>
       _step == BookingStep.searching ||
-          _step == BookingStep.loadingOffers ||
-          _step == BookingStep.initiatingBooking ||
-          _step == BookingStep.initiatingPayment ||
-          _step == BookingStep.confirmingPayment;
+      _step == BookingStep.loadingOffers ||
+      _step == BookingStep.initiatingBooking ||
+      _step == BookingStep.initiatingPayment ||
+      _step == BookingStep.confirmingPayment;
 
   // ── Step 1: Search ───────────────────────────────────────────────
   Future<bool> searchFlights({
@@ -135,11 +142,27 @@ class FlightBookingProvider extends ChangeNotifier {
     }
   }
 
+  /// Called by the seat map screen after the user confirms their seat choices.
+  /// [serviceIds] is the list of Duffel service IDs returned via Navigator.pop().
+  void setSeatServices(List<String> serviceIds) {
+    _selectedSeatServiceIds = List<String>.from(serviceIds);
+    notifyListeners();
+  }
+
   // ── Select offer ─────────────────────────────────────────────────
   void selectOffer(FlightOffer offer) {
     _selectedOffer = offer;
     _step = BookingStep.passengerDetails;
     notifyListeners();
+  }
+
+  /// Sets the selected offer without calling notifyListeners().
+  /// Use this when you need to set the offer mid-submit to avoid
+  /// triggering a widget rebuild that could interrupt navigation.
+  void setOfferSilently(FlightOffer offer) {
+    _selectedOffer = offer;
+    _step = BookingStep.passengerDetails;
+    // intentionally no notifyListeners()
   }
 
   // ── Step 3: Init Booking ─────────────────────────────────────────
@@ -159,6 +182,7 @@ class FlightBookingProvider extends ChangeNotifier {
         offerId: _selectedOffer!.offerId,
         passengers: passengers,
         tripType: tripType,
+        selectedSeatServiceIds: _selectedSeatServiceIds,
       );
       _step = BookingStep.bookingPending;
       notifyListeners();
@@ -216,6 +240,7 @@ class FlightBookingProvider extends ChangeNotifier {
       _confirmResult = await _paymentService.confirmPayment(
         bookingId: _currentBooking!.bookingId,
         sessionId: sessionId,
+        selectedSeatServiceIds: _selectedSeatServiceIds,
       );
       _step = BookingStep.confirmed;
       notifyListeners();
@@ -242,6 +267,7 @@ class FlightBookingProvider extends ChangeNotifier {
     _selectedOffer = null;
     _currentBooking = null;
     _passengers = [];
+    _selectedSeatServiceIds = [];
     _paymentSession = null;
     _confirmResult = null;
     notifyListeners();

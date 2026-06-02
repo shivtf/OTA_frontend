@@ -45,7 +45,7 @@ class _FlightSearchScreenState extends State<FlightSearchScreen>
   List<Map<String, String>> _recentSearches = [];
 
   late TabController _tabController;
-  final List<String> _tripTypes = ['One Way', 'Round Trip'/*, 'Multi-City'*/];
+  final List<String> _tripTypes = ['One Way', 'Round Trip'];
   final List<String> _cabins = ['Economy', 'Business', 'First Class'];
 
   String get _departDate =>

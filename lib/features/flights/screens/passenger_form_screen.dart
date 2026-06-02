@@ -1,6 +1,7 @@
 // lib/features/flights/screens/passenger_form_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/routes/app_routes.dart';
@@ -31,6 +32,10 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
 
   bool _isSubmitting = false;
   int _currentPassengerIndex = 0; // which card is expanded / being filled
+  // Tracks which passenger tabs have been validated and confirmed via "Next Passenger".
+  // Forms that are not currently mounted cannot be re-validated, so we trust
+  // the validation that happened when the user pressed "Next Passenger".
+  final Set<int> _validatedPassengers = {};
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -102,16 +107,32 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
-    // Validate ALL passenger forms
-    bool allValid = true;
+    // Validate the currently visible form first
+    final currentFormValid =
+        _formKeys[_currentPassengerIndex].currentState?.validate() ?? false;
+    if (!currentFormValid) return;
+    // Mark the current passenger as validated
+    _validatedPassengers.add(_currentPassengerIndex);
+
+    // Check that every passenger tab has been validated.
+    // Forms on other tabs are not mounted so currentState is null —
+    // we rely on _validatedPassengers which is set when "Next Passenger" passes.
+    final List<int> unvalidated = [];
     for (int i = 0; i < _formKeys.length; i++) {
-      if (!(_formKeys[i].currentState?.validate() ?? false)) {
-        allValid = false;
-        // Jump to the first invalid passenger tab
-        setState(() => _currentPassengerIndex = i);
+      final state = _formKeys[i].currentState;
+      if (state != null) {
+        // Form is mounted — validate it live
+        if (!state.validate()) unvalidated.add(i);
+      } else if (!_validatedPassengers.contains(i)) {
+        // Form is not mounted AND was never confirmed — jump back to it
+        unvalidated.add(i);
       }
     }
-    if (!allValid) return;
+
+    if (unvalidated.isNotEmpty) {
+      setState(() => _currentPassengerIndex = unvalidated.first);
+      return;
+    }
     if (_offer == null) return;
 
     setState(() => _isSubmitting = true);
@@ -140,8 +161,16 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     });
 
     try {
-      final provider = FlightBookingProvider();
-      provider.selectOffer(_offer!);
+      // Use the existing provider from the widget tree (not a fresh instance).
+      // Do NOT call selectOffer() here — it triggers notifyListeners() which
+      // can rebuild this screen mid-submit and prevent navigation.
+      // Instead, set _selectedOffer directly and call initBooking ourselves.
+      final provider =
+          Provider.of<FlightBookingProvider>(context, listen: false);
+
+      // Manually set the offer on the shared provider without notifying listeners
+      provider.setOfferSilently(_offer!);
+
       final success = await provider.initBooking(
         passengers: passengers,
         tripType: 'ONE_WAY',
@@ -156,7 +185,10 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
           arguments: {
             'booking': provider.currentBooking,
             'offer': _offer,
-            'passengers': passengers, // real PassengerInput list with names
+            'passengers': passengers,
+            // Seat service IDs selected on the seat map screen. May be empty
+            // if the user skipped seat selection — that is fine.
+            'selectedSeatServiceIds': provider.selectedSeatServiceIds,
           },
         );
       } else {
@@ -165,7 +197,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      _showErrorSnack('An unexpected error occurred. Please try again.');
+      _showErrorSnack('Error: ${e.toString()}');
     }
   }
 
@@ -402,6 +434,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
             isLoading: false,
             onPressed: () {
               if (_formKeys[index].currentState?.validate() ?? false) {
+                _validatedPassengers.add(index);
                 setState(() => _currentPassengerIndex = index + 1);
               }
             },

@@ -24,7 +24,11 @@ class BookingItem {
   final String detail2Value;
   final double basePrice;
   final double taxAmount;
-  // final double serviceFee;
+  final double serviceFee;
+
+  /// Extra cost for selected seats — 0.0 if no seats chosen.
+  final double seatFee;
+
   final String emoji;
 
   /// The pending booking ID from POST /flights/book — sent to PaymentController.
@@ -49,15 +53,54 @@ class BookingItem {
     required this.detail2Value,
     required this.basePrice,
     required this.taxAmount,
-    // required this.serviceFee,
+    required this.serviceFee,
+    this.seatFee = 0.0,
     required this.emoji,
     this.bookingId,
     this.currency = 'USD',
     this.duffelOfferId,
     this.passengers = const [],
   });
-  double get total => basePrice + taxAmount;
-  // double get total => basePrice + taxAmount + serviceFee;
+
+  double get total => basePrice + taxAmount + serviceFee + seatFee;
+
+  /// Returns a copy of this BookingItem with updated seat selections.
+  /// [selections] maps passengerIndex → (designator, amount).
+  BookingItem withSeats(
+      Map<int, ({String designator, double amount})> selections) {
+    double extraFee = 0.0;
+    final updatedPassengers = passengers.asMap().entries.map((e) {
+      final sel = selections[e.key];
+      if (sel != null) {
+        extraFee += sel.amount;
+        return PassengerSummary(
+          name: e.value.name,
+          type: e.value.type,
+          seatNumber: sel.designator,
+        );
+      }
+      return e.value;
+    }).toList();
+
+    return BookingItem(
+      type: type,
+      title: title,
+      subtitle: subtitle,
+      detail1Label: detail1Label,
+      detail1Value: detail1Value,
+      detail2Label: detail2Label,
+      detail2Value: detail2Value,
+      basePrice: basePrice,
+      taxAmount: taxAmount,
+      serviceFee: serviceFee,
+      seatFee: extraFee,
+      emoji: emoji,
+      bookingId: bookingId,
+      currency: currency,
+      duffelOfferId: duffelOfferId,
+      passengers: updatedPassengers,
+    );
+  }
 
   String get typeLabel {
     switch (type) {
@@ -91,7 +134,8 @@ class BookingItem {
     required String bookingId,
     required double baseAmount,
     required double taxAmount,
-    // required double serviceFee,
+    required double serviceFee,
+    double seatFee = 0.0,
     required String currency,
     required String flightTitle,
     required String flightSubtitle,
@@ -110,7 +154,8 @@ class BookingItem {
         detail2Value: arrivalTime,
         basePrice: baseAmount,
         taxAmount: taxAmount,
-        // serviceFee: serviceFee,
+        serviceFee: serviceFee,
+        seatFee: seatFee,
         emoji: '✈️',
         bookingId: bookingId,
         currency: currency,

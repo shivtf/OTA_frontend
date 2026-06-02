@@ -9,6 +9,7 @@ import '../../../core/services/flight_service.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/custom_back_button.dart';
 import '../../auth/widgets/gradient_button.dart';
+import '../providers/flight_booking_provider.dart';
 
 class FlightDetailsScreen extends StatefulWidget {
   const FlightDetailsScreen({super.key});
@@ -1118,7 +1119,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
   Widget _buildSeatMapButton(
       BuildContext context, FlightOffer offer, bool isDark) {
     return OutlinedButton.icon(
-      onPressed: () {
+      onPressed: () async {
         final slice = offer.outbound;
         final flightInfo =
             '${slice.origin.iataCode} → ${slice.destination.iataCode}'
@@ -1134,7 +1135,12 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
           return label;
         }).toList();
 
-        Navigator.of(context).pushNamed(
+        // Pass the Duffel passenger IDs so the seat map can match the correct
+        // service entry per passenger per seat.
+        final passengerDuffelIds = offer.passengers.map((p) => p.id).toList();
+
+        // ── Await the result — seat map returns List<String> of serviceIds ──
+        final result = await Navigator.of(context).pushNamed(
           AppRoutes.seatMap,
           arguments: {
             'offerId': offer.offerId,
@@ -1142,11 +1148,56 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
             'passengerCount':
                 offer.passengers.isNotEmpty ? offer.passengers.length : 1,
             'passengerNames': passengerNames,
+            'passengerDuffelIds': passengerDuffelIds,
           },
         );
+
+        if (!context.mounted) return;
+
+        // Store the selected service IDs in the shared provider so the
+        // payment screen can send them to the backend on confirm.
+        if (result is List && result.isNotEmpty) {
+          final serviceIds = result.cast<String>();
+          Provider.of<FlightBookingProvider>(context, listen: false)
+              .setSeatServices(serviceIds);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.event_seat_rounded,
+                      color: Colors.white, size: 18),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${serviceIds.length} seat${serviceIds.length == 1 ? '' : 's'} selected',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.primaryStart,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       },
-      icon: const Icon(Icons.event_seat_rounded),
-      label: const Text('See Seat Map'),
+      icon: Consumer<FlightBookingProvider>(
+        builder: (_, prov, __) => Icon(
+          prov.selectedSeatServiceIds.isNotEmpty
+              ? Icons.event_seat_rounded
+              : Icons.event_seat_outlined,
+        ),
+      ),
+      label: Consumer<FlightBookingProvider>(
+        builder: (_, prov, __) => Text(
+          prov.selectedSeatServiceIds.isNotEmpty
+              ? 'Seats Selected (${prov.selectedSeatServiceIds.length})'
+              : 'Select Seats',
+        ),
+      ),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 52),
         foregroundColor: AppColors.primaryStart,
