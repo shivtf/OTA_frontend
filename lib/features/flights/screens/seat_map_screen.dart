@@ -1027,12 +1027,21 @@ class _SeatMapScreenState extends State<SeatMapScreen>
                   GestureDetector(
                     onTap: () {
                       HapticFeedback.mediumImpact();
-                      // Return only the assigned serviceIds (non-null)
-                      final serviceIds = _assignments
-                          .where((s) => s != null)
-                          .map((s) => s!.serviceId)
+                      // Return rich seat data keyed by passengerIndex so the
+                      // calling screen can update totals and passenger seats.
+                      final richResult = _assignments
+                          .asMap()
+                          .entries
+                          .where((e) => e.value != null)
+                          .map((e) => <String, dynamic>{
+                                'passengerIndex': e.key,
+                                'serviceId': e.value!.serviceId,
+                                'designator': e.value!.designator,
+                                'amount': e.value!.amount,
+                                'currency': e.value!.currency,
+                              })
                           .toList();
-                      Navigator.pop(context, serviceIds);
+                      Navigator.pop(context, richResult);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1171,8 +1180,16 @@ class _SeatInfo {
   });
 
   factory _SeatInfo.fromJson(Map<String, dynamic> j) {
-    final services = j['available_services'] as List<dynamic>? ?? [];
-    final isAvailable = services.isNotEmpty;
+    // Real API sends 'services'; mock data used 'available_services'
+    final services = (j['services'] as List<dynamic>?) ??
+        (j['available_services'] as List<dynamic>?) ??
+        [];
+
+    // 'available' from real API is authoritative; seat is only selectable
+    // when both available == true AND services list is non-empty (has a price)
+    final apiAvailable = j['available'] as bool? ?? services.isNotEmpty;
+    final isAvailable = apiAvailable && services.isNotEmpty;
+
     String? serviceId;
     double amount = 0.0;
     String currency = 'USD';

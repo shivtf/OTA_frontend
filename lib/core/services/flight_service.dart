@@ -81,6 +81,7 @@ class FlightService {
     required String offerId,
     required List<PassengerInput> passengers,
     String tripType = 'ONE_WAY',
+    List<String> selectedSeatServiceIds = const [],
   }) async {
     final res = await _client.post(
         '/flights/book',
@@ -88,6 +89,10 @@ class FlightService {
           'offerId': offerId,
           'tripType': tripType,
           'passengers': passengers.map((p) => p.toJson()).toList(),
+          // Persist selected seat service IDs to the DB at init time so they
+          // survive the Stripe redirect and are available at confirm time.
+          if (selectedSeatServiceIds.isNotEmpty)
+            'selectedSeatServiceIds': selectedSeatServiceIds,
         },
         auth: true);
     return FlightBooking.fromJson(res['data'] as Map<String, dynamic>);

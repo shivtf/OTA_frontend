@@ -66,7 +66,7 @@ class _PaymentScreenState extends State<PaymentScreen>
     detail2Value: '11:15 AM',
     basePrice: 542.00,
     taxAmount: 65.04,
-    // serviceFee: 15.00,
+    serviceFee: 15.00,
     emoji: '✈️',
     bookingId: 'demo-booking-001',
     currency: 'USD',
@@ -117,13 +117,16 @@ class _PaymentScreenState extends State<PaymentScreen>
     if (args is BookingItem) return args;
 
     // Map from PassengerFormScreen:
-    //   { 'booking': FlightBooking, 'offer': FlightOffer, 'passengers': List<PassengerInput> }
+    //   { 'booking': FlightBooking, 'offer': FlightOffer, 'passengers': List<PassengerInput>,
+    //     'seatSelections': Map<int, ({serviceId, designator, amount})> }
     if (args is Map) {
       try {
         final dynamic rawBooking = args['booking'];
         final dynamic rawOffer = args['offer'];
         final dynamic rawPassengers =
             args['passengers']; // List<PassengerInput>
+        // Fix Bug 3 & 4: seat selections forwarded from FlightDetailsScreen
+        final rawSeats = args['seatSelections'] as Map<dynamic, dynamic>? ?? {};
 
         if (rawOffer == null) return _demoBooking;
 
@@ -212,11 +215,12 @@ class _PaymentScreenState extends State<PaymentScreen>
         final paxCount = passengers.length;
         final paxLabel = paxCount == 1 ? '1 Adult' : '$paxCount Adults';
 
-        return BookingItem.fromFlightBooking(
+        // Build base BookingItem (no seat fee yet)
+        final baseItem = BookingItem.fromFlightBooking(
           bookingId: booking?.bookingId ?? '',
           baseAmount: pricing.baseAmount,
           taxAmount: pricing.taxAmount,
-          // serviceFee: 15.00,
+          serviceFee: 0.00, // set to 0 — platform doesn't charge a service fee
           currency: pricing.totalCurrency,
           flightTitle:
               '${offer.airline}  ${slice.origin.iataCode} → ${slice.destination.iataCode}',
@@ -226,6 +230,23 @@ class _PaymentScreenState extends State<PaymentScreen>
           duffelOfferId: offer.offerId,
           passengers: passengers,
         );
+
+        // Fix Bug 3 & 4: apply seat selections — adds seatFee and sets seatNumber
+        // on each PassengerSummary so checkout shows seat per passenger.
+        if (rawSeats.isNotEmpty) {
+          final typedSeats = rawSeats.map((k, v) {
+            final dynamic val = v;
+            return MapEntry(
+              k as int,
+              (
+                designator: val.designator as String,
+                amount: val.amount as double,
+              ),
+            );
+          });
+          return baseItem.withSeats(typedSeats);
+        }
+        return baseItem;
       } catch (e) {
         // Casting failed — show demo so screen isn't blank
         return _demoBooking;
