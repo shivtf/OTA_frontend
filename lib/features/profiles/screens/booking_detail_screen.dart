@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../flights/screens/cancel_booking_screen.dart';
+import 'eticket_screen.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/network/api_client.dart';
 
@@ -25,7 +26,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _booking;
-  bool _downloadingTicket = false;
+  bool _viewingTicket = false;
 
   // FIX: track whether the widget is still mounted before calling setState
   // after async operations so back-navigation doesn't cause freezes.
@@ -73,39 +74,28 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
-  Future<void> _downloadETicket() async {
-    _safeSetState(() => _downloadingTicket = true);
+  Future<void> _viewTicket() async {
+    _safeSetState(() => _viewingTicket = true);
     try {
-      await ApiClient.instance.post(
-        '/flights/bookings/${widget.bookingId}/eticket/email',
-        {},
-        auth: true,
+      await Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => ETicketScreen(
+            bookingId: widget.bookingId,
+            bookingRef: widget.bookingRef,
+          ),
+          transitionsBuilder: (_, anim, __, child) => SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(
+                CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+            child: child,
+          ),
+          transitionDuration: const Duration(milliseconds: 380),
+        ),
       );
-      if (!_disposed && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('E-ticket sent to your registered email'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!_disposed && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send e-ticket: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
     } finally {
-      _safeSetState(() => _downloadingTicket = false);
+      _safeSetState(() => _viewingTicket = false);
     }
   }
 
@@ -1375,17 +1365,17 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           if (_isConfirmed)
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _downloadingTicket ? null : _downloadETicket,
-                icon: _downloadingTicket
+                onPressed: _viewingTicket ? null : _viewTicket,
+                icon: _viewingTicket
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white),
                       )
-                    : const Icon(Icons.email_outlined, size: 18),
+                    : const Icon(Icons.confirmation_number_outlined, size: 18),
                 label: const Text(
-                  'Email E-Ticket',
+                  'View Ticket',
                   style: TextStyle(
                       fontWeight: FontWeight.w700, fontSize: AppSizes.fontSM),
                 ),
