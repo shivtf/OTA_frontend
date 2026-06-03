@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../flights/screens/cancel_booking_screen.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/network/api_client.dart';
 
@@ -1293,8 +1294,66 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           if (_isCancellable) ...[
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () {
-                  // TODO: Navigate to CancelBookingScreen
+                onPressed: () async {
+                  final b = _booking!;
+                  final slices = b['slices'] as List<dynamic>? ?? [];
+                  String flightInfo = widget.bookingRef;
+                  if (slices.isNotEmpty) {
+                    final s = slices.first as Map<String, dynamic>;
+                    final origin = (s['origin']
+                            as Map<String, dynamic>?)?['iataCode'] as String? ??
+                        '--';
+                    final dest = (s['destination']
+                            as Map<String, dynamic>?)?['iataCode'] as String? ??
+                        '--';
+                    final dep = s['departureAt'] as String?;
+                    String dateStr = '';
+                    if (dep != null) {
+                      try {
+                        final dt = DateTime.parse(dep).toLocal();
+                        const months = [
+                          '',
+                          'Jan',
+                          'Feb',
+                          'Mar',
+                          'Apr',
+                          'May',
+                          'Jun',
+                          'Jul',
+                          'Aug',
+                          'Sep',
+                          'Oct',
+                          'Nov',
+                          'Dec'
+                        ];
+                        dateStr = ' · ${dt.day} ${months[dt.month]}';
+                      } catch (_) {}
+                    }
+                    flightInfo = '$origin → $dest$dateStr';
+                  }
+
+                  await Navigator.of(context).push(
+                    PageRouteBuilder(
+                      pageBuilder: (_, __, ___) => CancelBookingScreen(
+                        bookingId: widget.bookingId,
+                        bookingRef: widget.bookingRef,
+                        flightInfo: flightInfo,
+                      ),
+                      transitionsBuilder: (_, anim, __, child) =>
+                          SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(1, 0),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                            parent: anim, curve: Curves.easeOutCubic)),
+                        child: child,
+                      ),
+                      transitionDuration: const Duration(milliseconds: 320),
+                    ),
+                  );
+
+                  // Reload booking after returning — status may now be CANCELLED
+                  _load();
                 },
                 icon: const Icon(Icons.cancel_outlined, size: 18),
                 label: const Text(
