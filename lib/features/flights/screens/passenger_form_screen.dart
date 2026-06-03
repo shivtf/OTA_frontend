@@ -392,7 +392,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
             _SectionHeader(
               icon: Icons.document_scanner_rounded,
               title: 'Travel Document',
-              subtitle: 'Optional',
+              subtitle: 'Required',
               isDark: isDark,
             ),
             const SizedBox(height: 14),

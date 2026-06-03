@@ -18,6 +18,7 @@ import 'core/utils/reset_password_token_cache.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/flights/providers/flight_booking_provider.dart';
 import 'features/payment/controllers/payment_controller.dart'; // ← NEW
+import 'features/home/providers/booking_stats_provider.dart';
 
 class WanderlyApp extends StatefulWidget {
   final AuthProvider authProvider;
@@ -48,9 +49,9 @@ class _WanderlyAppState extends State<WanderlyApp> {
     }
 
     _linkSubscription = AppLinks().uriLinkStream.listen(
-          _handleLink,
-          onError: (_) {},
-        );
+      _handleLink,
+      onError: (_) {},
+    );
   }
 
   Future<void> _handleLink(Uri uri) async {
@@ -61,7 +62,7 @@ class _WanderlyAppState extends State<WanderlyApp> {
       final message = uri.queryParameters['message'] ?? 'Verification failed.';
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
-        (route) => false,
+            (route) => false,
         arguments: {'status': status, 'message': message},
       );
     } else if (uri.path == '/verify') {
@@ -77,7 +78,7 @@ class _WanderlyAppState extends State<WanderlyApp> {
       }
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.resetPassword,
-        (route) => false,
+            (route) => false,
         // Still pass via arguments as a fallback — cache is the primary source.
         arguments: {'token': token},
       );
@@ -92,13 +93,13 @@ class _WanderlyAppState extends State<WanderlyApp> {
       );
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
-        (route) => false,
+            (route) => false,
         arguments: {'status': 'success'},
       );
     } catch (_) {
       _navigatorKey.currentState?.pushNamedAndRemoveUntil(
         AppRoutes.emailVerified,
-        (route) => false,
+            (route) => false,
         arguments: {
           'status': 'error',
           'message': 'Verification failed. The link may have expired.',
@@ -124,6 +125,7 @@ class _WanderlyAppState extends State<WanderlyApp> {
         // Changing AppConfig.paymentGateway is the ONLY required change
         // to switch payment providers in production.
         ChangeNotifierProvider(create: (_) => PaymentController()),
+        ChangeNotifierProvider(create: (_) => BookingStatsProvider()),
       ],
       child: Consumer<ThemeController>(
         builder: (context, themeController, child) {

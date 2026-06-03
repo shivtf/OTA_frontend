@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:app_links/app_links.dart';
-import 'app.dart';
+import 'package:wanderly/app.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/payment/models/stripe_service.dart';
 
@@ -28,10 +28,7 @@ void main() async {
 
   // Resolve the initial deep link before runApp so it is available
   // synchronously when the first frame builds — no race condition.
-  Uri? initialDeepLink;
-  try {
-    initialDeepLink = await AppLinks().getInitialLink();
-  } catch (_) {}
+  Uri? initialDeepLink = await AppLinks().getInitialLink().catchError((_) => null);
 
   runApp(WanderlyApp(
     authProvider: authProvider,

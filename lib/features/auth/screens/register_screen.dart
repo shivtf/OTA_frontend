@@ -62,9 +62,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       gender: _gender,
       email: _emailController.text.trim(),
       phone: phone,
-      passportNumber: _passportController.text.trim().isEmpty
-          ? null
-          : _passportController.text.trim(),
+      passportNumber: _passportController.text.trim(),
       passportExpiryDate: _passportExpiryController.text.trim().isEmpty
           ? null
           : _passportExpiryController.text.trim(),
@@ -76,7 +74,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final passengerIndex = (args?['passengerIndex'] as int?) ?? 0;
     final passengerCount = (args?['passengerCount'] as int?) ?? 1;
 
@@ -86,7 +84,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: padding),
@@ -234,15 +232,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 const SizedBox(height: AppSizes.paddingXL),
 
                 _SectionLabel(
-                    label: 'Travel Document (Optional)', isDark: isDark),
+                    label: 'Travel Document', isDark: isDark),
                 const SizedBox(height: AppSizes.paddingMD),
 
                 CustomTextField(
-                  label: 'Passport Number',
+                  label: 'Passport Number *',
                   hint: 'A1234567',
                   prefixIcon: Icons.badge_outlined,
                   controller: _passportController,
                   textInputAction: TextInputAction.next,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? AppStrings.fieldRequired
+                      : null,
                 ),
                 const SizedBox(height: AppSizes.paddingMD),
 
@@ -317,14 +318,14 @@ class _DropdownField extends StatelessWidget {
               dropdownColor: isDark ? AppColors.darkCard : Colors.white,
               items: items.entries
                   .map((e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Text(e.value,
-                            style: TextStyle(
-                              color: isDark
-                                  ? AppColors.darkTextPrimary
-                                  : AppColors.lightTextPrimary,
-                            )),
-                      ))
+                value: e.key,
+                child: Text(e.value,
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
+                    )),
+              ))
                   .toList(),
               onChanged: onChanged,
             ),
@@ -338,7 +339,12 @@ class _DropdownField extends StatelessWidget {
 class _SectionLabel extends StatelessWidget {
   final String label;
   final bool isDark;
-  const _SectionLabel({required this.label, required this.isDark});
+  final bool isOptional;
+  const _SectionLabel({
+    required this.label,
+    required this.isDark,
+    this.isOptional = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -361,6 +367,24 @@ class _SectionLabel extends StatelessWidget {
                   ? AppColors.darkTextPrimary
                   : AppColors.lightTextPrimary,
             )),
+        if (isOptional) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.primaryStart.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Optional',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryStart,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
