@@ -23,6 +23,11 @@ class FilterChipRow extends StatelessWidget {
   final PriceSortOrder priceSortOrder;
   final ValueChanged<PriceSortOrder>? onPriceSortChanged;
 
+  // ── Stops filter ───────────────────────────────────────────────────────────
+  /// null = Any, 0 = Non-stop, 1 = 1 stop, 2 = 2+ stops
+  final int? stopsFilter;
+  final ValueChanged<int?>? onStopsChanged;
+
   // ── Price range (slider filter) ────────────────────────────────────────────
   // final double? activePriceMin;
   // final double? activePriceMax;
@@ -40,6 +45,8 @@ class FilterChipRow extends StatelessWidget {
     required this.isDark,
     this.priceSortOrder = PriceSortOrder.none,
     this.onPriceSortChanged,
+    this.stopsFilter,
+    this.onStopsChanged,
     // this.activePriceMin,
     // this.activePriceMax,
     // this.onPriceRangeChanged,
@@ -94,6 +101,15 @@ class FilterChipRow extends StatelessWidget {
 
   bool get _sortChipActive => priceSortOrder != PriceSortOrder.none;
 
+  String get _stopsChipLabel {
+    switch (stopsFilter) {
+      case 0: return 'Non-stop';
+      case 1: return '1 Stop';
+      case 2: return '2+ Stops';
+      default: return 'Stops';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -120,6 +136,15 @@ class FilterChipRow extends StatelessWidget {
               onTap: () => onPriceSortChanged!(_nextSortOrder),
             ),
 
+          // ── Stops filter chip ─────────────────────────────────────────────
+          if (onStopsChanged != null)
+            _StopsChip(
+              label: _stopsChipLabel,
+              isActive: stopsFilter != null,
+              isDark: isDark,
+              onTap: () => _showStopsSheet(context),
+            ),
+
           // ── Price range filter chip ────────────────────────────────────────
           // if (onPriceRangeChanged != null)
           //   _PriceRangeChip(
@@ -133,33 +158,63 @@ class FilterChipRow extends StatelessWidget {
     );
   }
 
-// void _showPriceSheet(BuildContext context) {
-//   showModalBottomSheet(
-//     context: context,
-//     isScrollControlled: true,
-//     backgroundColor: Colors.transparent,
-//     builder: (_) => _PriceRangeSheet(
-//       isDark: isDark,
-//       currency: currency,
-//       minPrice: offerMinPrice,
-//       maxPrice: offerMaxPrice,
-//       currentMin: activePriceMin ?? offerMinPrice,
-//       currentMax: activePriceMax ?? offerMaxPrice,
-//       onApply: (min, max) {
-//         final clearMin = min <= offerMinPrice;
-//         final clearMax = max >= offerMaxPrice;
-//         onPriceRangeChanged?.call(
-//           clearMin ? null : min,
-//           clearMax ? null : max,
-//         );
-//       },
-//       onClear: () => onPriceRangeChanged?.call(null, null),
-//     ),
-//   );
-// }
+  // void _showPriceSheet(BuildContext context) {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     backgroundColor: Colors.transparent,
+  //     builder: (_) => _PriceRangeSheet(
+  //       isDark: isDark,
+  //       currency: currency,
+  //       minPrice: offerMinPrice,
+  //       maxPrice: offerMaxPrice,
+  //       currentMin: activePriceMin ?? offerMinPrice,
+  //       currentMax: activePriceMax ?? offerMaxPrice,
+  //       onApply: (min, max) {
+  //         final clearMin = min <= offerMinPrice;
+  //         final clearMax = max >= offerMaxPrice;
+  //         onPriceRangeChanged?.call(
+  //           clearMin ? null : min,
+  //           clearMax ? null : max,
+  //         );
+  //       },
+  //       onClear: () => onPriceRangeChanged?.call(null, null),
+  //     ),
+  //   );
+  // }
+
+  void _showStopsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StopsSheet(
+        isDark: isDark,
+        currentStops: stopsFilter,
+        onChanged: (value) {
+          onStopsChanged?.call(value);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
 }
 
 // ── Generic filter chip ────────────────────────────────────────────────────────
+
+/// Maps well-known filter label strings to their icon.
+IconData? _iconForFilter(String label) {
+  switch (label.toLowerCase()) {
+    case 'direct':
+      return Icons.flight_rounded;
+    case 'refundable':
+      return Icons.undo_rounded;
+    case 'changeable':
+      return Icons.swap_horiz_rounded;
+    default:
+      return null;
+  }
+}
 
 class _FilterChip extends StatelessWidget {
   final String label;
@@ -176,6 +231,10 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final icon = _iconForFilter(label);
+    final inactiveColor =
+    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -203,17 +262,25 @@ class _FilterChip extends StatelessWidget {
           ]
               : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: AppSizes.fontSM,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-            color: isActive
-                ? Colors.white
-                : (isDark
-                ? AppColors.darkTextSecondary
-                : AppColors.lightTextSecondary),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 13,
+                  color: isActive ? Colors.white : inactiveColor),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: AppSizes.fontSM,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? Colors.white : inactiveColor,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -292,6 +359,213 @@ class _SortChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Stops filter chip ─────────────────────────────────────────────────────────
+
+class _StopsChip extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _StopsChip({
+    required this.label,
+    required this.isActive,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final inactiveColor =
+    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: isActive ? AppColors.primaryGradient : null,
+          color: isActive
+              ? null
+              : (isDark ? AppColors.darkCard : AppColors.lightCard),
+          borderRadius: BorderRadius.circular(20),
+          border: isActive
+              ? null
+              : Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+          boxShadow: isActive
+              ? [
+            BoxShadow(
+              color: AppColors.primaryStart.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            )
+          ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(Icons.connecting_airports_rounded,
+                size: 14,
+                color: isActive ? Colors.white : inactiveColor),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: AppSizes.fontSM,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? Colors.white : inactiveColor,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 14,
+                color: isActive ? Colors.white : inactiveColor),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stops bottom sheet ─────────────────────────────────────────────────────────
+
+class _StopsSheet extends StatelessWidget {
+  final bool isDark;
+  final int? currentStops;
+  final ValueChanged<int?> onChanged;
+
+  const _StopsSheet({
+    required this.isDark,
+    required this.currentStops,
+    required this.onChanged,
+  });
+
+  static const _options = [
+    (label: 'Any', sublabel: 'Show all flights', value: null, icon: Icons.all_inclusive_rounded),
+    (label: 'Non-stop', sublabel: 'Direct flights only', value: 0, icon: Icons.flight_rounded),
+    (label: '1 Stop', sublabel: 'One connection', value: 1, icon: Icons.looks_one_rounded),
+    (label: '2+ Stops', sublabel: 'Two or more connections', value: 2, icon: Icons.looks_two_rounded),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? AppColors.darkCard : Colors.white;
+    final textPrimary =
+    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final textSecondary =
+    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // drag handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: borderColor,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Number of Stops',
+              style: TextStyle(
+                  fontSize: AppSizes.fontXXL,
+                  fontWeight: FontWeight.w800,
+                  color: textPrimary)),
+          const SizedBox(height: 4),
+          Text('Filter flights by number of stops',
+              style: TextStyle(
+                  fontSize: AppSizes.fontSM, color: textSecondary)),
+          const SizedBox(height: 20),
+          ..._options.map((opt) {
+            final isSelected = currentStops == opt.value;
+            return GestureDetector(
+              onTap: () => onChanged(opt.value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: isSelected ? AppColors.primaryGradient : null,
+                  color: isSelected
+                      ? null
+                      : (isDark
+                      ? AppColors.darkInputBg
+                      : AppColors.lightInputBg),
+                  borderRadius: BorderRadius.circular(16),
+                  border: isSelected
+                      ? null
+                      : Border.all(color: borderColor),
+                  boxShadow: isSelected
+                      ? [
+                    BoxShadow(
+                      color:
+                      AppColors.primaryStart.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    )
+                  ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(opt.icon,
+                        size: 20,
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.primaryStart),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(opt.label,
+                              style: TextStyle(
+                                  fontSize: AppSizes.fontMD,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : textPrimary)),
+                          const SizedBox(height: 2),
+                          Text(opt.sublabel,
+                              style: TextStyle(
+                                  fontSize: AppSizes.fontXS,
+                                  color: isSelected
+                                      ? Colors.white.withValues(alpha: 0.8)
+                                      : textSecondary)),
+                        ],
+                      ),
+                    ),
+                    if (isSelected)
+                      const Icon(Icons.check_circle_rounded,
+                          size: 20, color: Colors.white),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

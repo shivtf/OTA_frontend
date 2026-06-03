@@ -102,6 +102,9 @@ class _FlightResultsScreenState extends State<FlightResultsScreen>
     if (_activeFilters.contains('Refundable')) {
       list = list.where((f) => f.conditions?.refundable == true).toList();
     }
+    if (_activeFilters.contains('Changeable')) {
+      list = list.where((f) => f.conditions?.changeable == true).toList();
+    }
 
     // Dynamic price range filter
     if (_priceMin != null) {
@@ -171,7 +174,7 @@ class _FlightResultsScreenState extends State<FlightResultsScreen>
           // ── Filter + sort chip row ─────────────────────────────────────────
           SliverToBoxAdapter(
             child: FilterChipRow(
-              filters: const ['Direct', 'Refundable'],
+              filters: const ['Direct', 'Refundable', 'Changeable'],
               activeFilters: _activeFilters,
               isDark: isDark,
               onToggle: (f) => setState(() {
