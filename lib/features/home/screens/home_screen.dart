@@ -15,6 +15,7 @@ import '../../profiles/screens/my_bookings_screen.dart';
 import '../../profiles/screens/update_profile_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/screens/change_password_screen.dart';
+import '../providers/booking_stats_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -185,17 +186,48 @@ class _HomeTab extends StatelessWidget {
 }
 
 // ─── Header ───────────────────────────────────────────────────────────────────
-class _HomeHeader extends StatelessWidget {
+// Changed to StatefulWidget so it can trigger a stats refresh on first load.
+class _HomeHeader extends StatefulWidget {
   final bool isDark;
   final ThemeController tc;
   const _HomeHeader({required this.isDark, required this.tc});
 
   @override
+  State<_HomeHeader> createState() => _HomeHeaderState();
+}
+
+class _HomeHeaderState extends State<_HomeHeader> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch confirmed booking stats as soon as the header mounts.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BookingStatsProvider>().refresh();
+    });
+  }
+
+  String _greeting(String name) {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning, $name 👋';
+    if (h < 17) return 'Good afternoon, $name 👋';
+    return 'Good evening, $name 👋';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final tc = widget.tc;
+
     final user = context.watch<AuthProvider>().user;
     final firstName = (user?.firstName.isNotEmpty == true)
         ? user!.firstName
         : 'Traveler';
+
+    // ── Dynamic counts from confirmed bookings only ──────────────────────
+    final stats = context.watch<BookingStatsProvider>();
+    final tripLabel = stats.loading ? '—' : '${stats.tripCount} Trips';
+    final countryLabel =
+    stats.loading ? '—' : '${stats.countryCount} Countries';
 
     return Container(
       decoration: BoxDecoration(
@@ -230,7 +262,7 @@ class _HomeHeader extends StatelessWidget {
                     child: Text(
                       _greeting(firstName),
                       style: TextStyle(
-                        fontSize: AppSizes.fontMD, // increased from fontSM
+                        fontSize: AppSizes.fontMD,
                         color: Colors.white.withValues(alpha: 0.9),
                         fontWeight: FontWeight.w600,
                       ),
@@ -263,9 +295,9 @@ class _HomeHeader extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              // ── Where to next on its own line ──
+              // ── Where to next — airplane replaces globe ──
               const Text(
-                'Where to next? 🌍',
+                'Where to next? ✈️',
                 style: TextStyle(
                   fontSize: AppSizes.fontXXL,
                   fontWeight: FontWeight.w800,
@@ -273,15 +305,16 @@ class _HomeHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
+              // ── Stat chips — trips & countries are dynamic ──
               Row(
                 children: [
                   _StatChip(
-                      icon: Icons.flight_takeoff_rounded, label: '12 Trips'),
-                  const SizedBox(width: 10),
-                  _StatChip(icon: Icons.star_rounded, label: '4.9 Rating'),
+                      icon: Icons.flight_takeoff_rounded, label: tripLabel),
+                  // const SizedBox(width: 10),
+                  // _StatChip(icon: Icons.star_rounded, label: '4.9 Rating'),
                   const SizedBox(width: 10),
                   _StatChip(
-                      icon: Icons.location_on_rounded, label: '8 Countries'),
+                      icon: Icons.location_on_rounded, label: countryLabel),
                 ],
               ),
             ],
@@ -289,13 +322,6 @@ class _HomeHeader extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _greeting(String name) {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning, $name 👋';
-    if (h < 17) return 'Good afternoon, $name 👋';
-    return 'Good evening, $name 👋';
   }
 }
 

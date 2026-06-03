@@ -11,10 +11,21 @@ class QuickCategoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final categories = [
-      {'icon': Icons.flight_rounded, 'label': 'Flights', 'route': AppRoutes.flightSearch},
-      {'icon': Icons.hotel_rounded, 'label': 'Hotels', 'route': AppRoutes.hotelSearch},
-      {'icon': Icons.directions_car_rounded, 'label': 'Cars', 'route': AppRoutes.carSearch},
-      {'icon': Icons.card_giftcard_rounded, 'label': 'Packages', 'route': null},
+      {
+        'icon': Icons.flight_rounded,
+        'label': 'Flights',
+        'route': AppRoutes.flightSearch,
+      },
+      {
+        'icon': Icons.hotel_rounded,
+        'label': 'Hotels',
+        'route': AppRoutes.hotelSearch,
+      },
+      {
+        'icon': Icons.directions_car_rounded,
+        'label': 'Cars',
+        'route': AppRoutes.carSearch,
+      },
     ];
 
     return Column(
@@ -25,18 +36,22 @@ class QuickCategoryRow extends StatelessWidget {
           style: TextStyle(
             fontSize: AppSizes.fontLG,
             fontWeight: FontWeight.w700,
-            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+            color: isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary,
           ),
         ),
         const SizedBox(height: 14),
+        // Use Row with Expanded so the 3 items fill the full width evenly
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: categories.map((c) {
-            return _CategoryItem(
-              icon: c['icon'] as IconData,
-              label: c['label'] as String,
-              route: c['route'] as String?,
-              isDark: isDark,
+            return Expanded(
+              child: _CategoryItem(
+                icon: c['icon'] as IconData,
+                label: c['label'] as String,
+                route: c['route'] as String?,
+                isDark: isDark,
+              ),
             );
           }).toList(),
         ),
@@ -67,27 +82,27 @@ class _CategoryItem extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 64,
-            height: 64,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
               gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primaryStart.withOpacity(0.35),
+                  color: AppColors.primaryStart.withValues(alpha: 0.35),
                   blurRadius: 14,
                   offset: const Offset(0, 6),
                   spreadRadius: -2,
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 28),
+            child: Icon(icon, color: Colors.white, size: 30),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             label,
             style: TextStyle(
-              fontSize: AppSizes.fontSM,
+              fontSize: AppSizes.fontMD,
               fontWeight: FontWeight.w600,
               color: isDark
                   ? AppColors.darkTextPrimary

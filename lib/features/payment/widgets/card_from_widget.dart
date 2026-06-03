@@ -1,208 +1,293 @@
-// lib/features/payment/widgets/card_form_widget.dart
+// lib/features/payment/widgets/card_from_widget.dart
+//
+// FIXES APPLIED (do not revert):
+//
+//   FIX 2 — Card number: spaces between digit groups are NOT counted toward
+//            the 16-digit limit. Previously the formatter treated each inserted
+//            space as a character, so the last 3 digits were swallowed.
+//            Solution: _CardNumberFormatter strips all non-digits first, clamps
+//            to 16, then re-inserts spaces — cursor always lands at the end.
+//
+//   FIX 3 — CVV: hard-capped at 3 digits via LengthLimitingTextInputFormatter.
+//            The validator also rejects anything shorter than 3 digits.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public widget + state (GlobalKey<CardFormWidgetState> lets PaymentScreen
+// call .validate() before processing payment)
+// ─────────────────────────────────────────────────────────────────────────────
 
 class CardFormWidget extends StatefulWidget {
   final GlobalKey<CardFormWidgetState> formKey;
   final bool isDark;
 
   const CardFormWidget({
-    super.key,
     required this.formKey,
     required this.isDark,
-  });
+  }) : super(key: formKey);
 
   @override
-  State<CardFormWidget> createState() => CardFormWidgetState();
+  CardFormWidgetState createState() => CardFormWidgetState();
 }
 
 class CardFormWidgetState extends State<CardFormWidget> {
-  final _cardNumberController = TextEditingController();
-  final _cardholderController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  final _holderController = TextEditingController();
+  final _numberController = TextEditingController();
   final _expiryController = TextEditingController();
   final _cvvController = TextEditingController();
-  bool _saveCard = false;
+
   bool _cvvVisible = false;
 
-  String get cardNumber => _cardNumberController.text.replaceAll(' ', '');
-  String get cardholder => _cardholderController.text;
-  String get expiry => _expiryController.text;
-  String get cvv => _cvvController.text;
-  bool get saveCard => _saveCard;
-
-  bool validate() {
-    return cardNumber.length == 16 &&
-        cardholder.trim().isNotEmpty &&
-        expiry.length == 5 &&
-        cvv.length >= 3;
-  }
+  // Called by PaymentScreen via GlobalKey
+  bool validate() => _formKey.currentState?.validate() ?? false;
 
   @override
   void dispose() {
-    _cardNumberController.dispose();
-    _cardholderController.dispose();
+    _holderController.dispose();
+    _numberController.dispose();
     _expiryController.dispose();
     _cvvController.dispose();
     super.dispose();
   }
 
+  // ── Raw digit count helper (spaces excluded) ────────────────────────────
+  String get _rawDigits => _numberController.text.replaceAll(' ', '');
+
+  // ── Card preview number (groups of 4, padded to 16) ────────────────────
+  String get _previewNumber {
+    final d = _rawDigits.padRight(16, '•');
+    return '${d.substring(0, 4)}  ${d.substring(4, 8)}  '
+        '${d.substring(8, 12)}  ${d.substring(12, 16)}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: widget.isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
-        border: Border.all(
-            color: widget.isDark
-                ? AppColors.darkBorder
-                : AppColors.lightBorder),
-      ),
+    final isDark = widget.isDark;
+
+    return Form(
+      key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Live card preview
+          // ── Card preview ──────────────────────────────────────────────
           _CardPreview(
-            number: _cardNumberController.text,
-            holder: _cardholderController.text,
-            expiry: _expiryController.text,
+            number: _previewNumber,
+            holder: _holderController.text.isEmpty
+                ? 'YOUR NAME'
+                : _holderController.text.toUpperCase(),
+            expiry: _expiryController.text.isEmpty
+                ? 'MM/YY'
+                : _expiryController.text,
           ),
           const SizedBox(height: 20),
 
-          // Cardholder name
-          _CardField(
-            label: 'Cardholder Name',
+          // ── Cardholder name ───────────────────────────────────────────
+          _label('Cardholder Name', isDark),
+          const SizedBox(height: 6),
+          _buildField(
+            controller: _holderController,
             hint: 'John Doe',
-            controller: _cardholderController,
             icon: Icons.person_outline_rounded,
-            isDark: widget.isDark,
-            inputType: TextInputType.name,
-            capitalization: TextCapitalization.words,
+            isDark: isDark,
+            keyboardType: TextInputType.name,
             onChanged: (_) => setState(() {}),
+            validator: (v) =>
+            (v == null || v.trim().isEmpty) ? 'Name is required' : null,
           ),
           const SizedBox(height: 14),
 
-          // Card number
-          _CardField(
-            label: 'Card Number',
-            hint: '1234  5678  9012  3456',
-            controller: _cardNumberController,
+          // ── Card number — FIX 2 ───────────────────────────────────────
+          _label('Card Number', isDark),
+          const SizedBox(height: 6),
+          _buildField(
+            controller: _numberController,
+            hint: '0000  0000  0000  0000',
             icon: Icons.credit_card_rounded,
-            isDark: widget.isDark,
-            inputType: TextInputType.number,
-            maxLength: 19,
-            formatters: [
+            isDark: isDark,
+            keyboardType: TextInputType.number,
+            // FIX 2: formatter strips spaces before counting digits,
+            // so all 16 digits are always captured correctly.
+            inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               _CardNumberFormatter(),
             ],
             onChanged: (_) => setState(() {}),
+            validator: (v) {
+              final digits = (v ?? '').replaceAll(' ', '');
+              if (digits.isEmpty) return 'Card number is required';
+              if (digits.length < 16) return 'Enter all 16 digits';
+              return null;
+            },
           ),
           const SizedBox(height: 14),
 
-          // Expiry + CVV row
+          // ── Expiry + CVV row ──────────────────────────────────────────
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Expiry
               Expanded(
-                child: _CardField(
-                  label: 'Expiry',
-                  hint: 'MM/YY',
-                  controller: _expiryController,
-                  icon: Icons.calendar_today_rounded,
-                  isDark: widget.isDark,
-                  inputType: TextInputType.number,
-                  maxLength: 5,
-                  formatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    _ExpiryFormatter(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _label('Expiry', isDark),
+                    const SizedBox(height: 6),
+                    _buildField(
+                      controller: _expiryController,
+                      hint: 'MM/YY',
+                      icon: Icons.calendar_month_outlined,
+                      isDark: isDark,
+                      keyboardType: TextInputType.datetime,
+                      inputFormatters: [_ExpiryFormatter()],
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (!RegExp(r'^\d{2}/\d{2}$').hasMatch(v)) {
+                          return 'Use MM/YY';
+                        }
+                        return null;
+                      },
+                    ),
                   ],
-                  onChanged: (_) => setState(() {}),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
+
+              // CVV — FIX 3
               Expanded(
-                child: _CardField(
-                  label: 'CVV',
-                  hint: '•••',
-                  controller: _cvvController,
-                  icon: Icons.lock_outline_rounded,
-                  isDark: widget.isDark,
-                  inputType: TextInputType.number,
-                  maxLength: 4,
-                  obscure: !_cvvVisible,
-                  suffixIcon: GestureDetector(
-                    onTap: () => setState(() => _cvvVisible = !_cvvVisible),
-                    child: Icon(
-                      _cvvVisible
-                          ? Icons.visibility_rounded
-                          : Icons.visibility_off_rounded,
-                      size: 16,
-                      color: widget.isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _label('CVV', isDark),
+                    const SizedBox(height: 6),
+                    _buildField(
+                      controller: _cvvController,
+                      hint: '•••',
+                      icon: Icons.lock_outline_rounded,
+                      isDark: isDark,
+                      obscureText: !_cvvVisible,
+                      keyboardType: TextInputType.number,
+                      // FIX 3: hard limit of 3 digits — cannot type a 4th digit
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3),
+                      ],
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _cvvVisible
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 18,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
+                        onPressed: () =>
+                            setState(() => _cvvVisible = !_cvvVisible),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (v.length != 3) return 'Must be 3 digits';
+                        return null;
+                      },
                     ),
-                  ),
-                  formatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (_) => setState(() {}),
+                  ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-
-          // Save card toggle
-          GestureDetector(
-            onTap: () => setState(() => _saveCard = !_saveCard),
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    gradient:
-                    _saveCard ? AppColors.primaryGradient : null,
-                    color: _saveCard
-                        ? null
-                        : (widget.isDark
-                        ? AppColors.darkInputBg
-                        : AppColors.lightInputBg),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: _saveCard
-                          ? AppColors.primaryStart
-                          : (widget.isDark
-                          ? AppColors.darkBorder
-                          : AppColors.lightBorder),
-                    ),
-                  ),
-                  child: _saveCard
-                      ? const Icon(Icons.check_rounded,
-                      color: Colors.white, size: 13)
-                      : null,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Save card for future payments',
-                  style: TextStyle(
-                    fontSize: AppSizes.fontSM,
-                    fontWeight: FontWeight.w500,
-                    color: widget.isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
+
+  // ── Shared field builder ────────────────────────────────────────────────
+
+  Widget _buildField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    required bool isDark,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    TextInputAction textInputAction = TextInputAction.next,
+    List<TextInputFormatter>? inputFormatters,
+    ValueChanged<String>? onChanged,
+    FormFieldValidator<String>? validator,
+    Widget? suffixIcon,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      inputFormatters: inputFormatters,
+      onChanged: onChanged,
+      validator: validator,
+      style: TextStyle(
+        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+        fontSize: AppSizes.fontMD,
+      ),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: isDark
+              ? AppColors.darkTextSecondary
+              : AppColors.lightTextSecondary,
+        ),
+        prefixIcon: Icon(icon, size: 18, color: AppColors.primaryMid),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          borderSide: BorderSide(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          borderSide: BorderSide(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          borderSide: const BorderSide(color: AppColors.primaryMid, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          borderSide: const BorderSide(color: AppColors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          borderSide: const BorderSide(color: AppColors.error, width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _label(String text, bool isDark) => Text(
+    text,
+    style: TextStyle(
+      fontSize: AppSizes.fontSM,
+      fontWeight: FontWeight.w600,
+      color: isDark
+          ? AppColors.darkTextSecondary
+          : AppColors.lightTextSecondary,
+    ),
+  );
 }
 
-// ── Card preview widget ───────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Card preview widget
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _CardPreview extends StatelessWidget {
   final String number;
@@ -217,278 +302,143 @@ class _CardPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayNumber = number.isEmpty
-        ? '••••  ••••  ••••  ••••'
-        : number.padRight(19, '•');
-
     return Container(
-      height: 180,
-      width: double.infinity,
+      height: 185,
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+        gradient: AppColors.cardGradient,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryStart.withOpacity(0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-            spreadRadius: -4,
+            color: AppColors.primaryStart.withValues(alpha: 0.4),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: Stack(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Background circles
-          Positioned(
-            top: -20, right: -20,
-            child: Container(
-              width: 140, height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.08),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -40, left: -20,
-            child: Container(
-              width: 160, height: 160,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.06),
-              ),
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top row: chip + brand
-                Row(children: [
-                  // Chip icon
-                  Container(
-                    width: 36, height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(5),
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.3)),
-                    ),
-                    child: const Icon(Icons.memory_rounded,
-                        color: Colors.white, size: 16),
-                  ),
-                  const Spacer(),
-                  const Text('WANDERLY',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 2,
-                      )),
-                ]),
-
-                const Spacer(),
-
-                // Card number
-                Text(
-                  displayNumber.length > 19
-                      ? displayNumber.substring(0, 19)
-                      : displayNumber,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2.5,
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // Holder + expiry
-                Row(children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('CARD HOLDER',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 9,
-                              letterSpacing: 1,
-                            )),
-                        Text(
-                          holder.isEmpty ? 'YOUR NAME' : holder.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ]),
-                  const Spacer(),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text('EXPIRES',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 9,
-                              letterSpacing: 1,
-                            )),
-                        Text(
-                          expiry.isEmpty ? 'MM/YY' : expiry,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ]),
-                ]),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Reusable card input field ─────────────────────────────────────────────────
-
-class _CardField extends StatelessWidget {
-  final String label, hint;
-  final TextEditingController controller;
-  final IconData icon;
-  final bool isDark;
-  final TextInputType inputType;
-  final int? maxLength;
-  final List<TextInputFormatter>? formatters;
-  final ValueChanged<String> onChanged;
-  final bool obscure;
-  final Widget? suffixIcon;
-  final TextCapitalization capitalization;
-
-  const _CardField({
-    required this.label,
-    required this.hint,
-    required this.controller,
-    required this.icon,
-    required this.isDark,
-    required this.inputType,
-    required this.onChanged,
-    this.maxLength,
-    this.formatters,
-    this.obscure = false,
-    this.suffixIcon,
-    this.capitalization = TextCapitalization.none,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: AppSizes.fontXS,
-            fontWeight: FontWeight.w600,
-            color: isDark
-                ? AppColors.darkTextSecondary
-                : AppColors.lightTextSecondary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
-            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-            border: Border.all(
-                color: isDark
-                    ? AppColors.darkBorder
-                    : AppColors.lightBorder),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: AppColors.primaryStart),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  obscureText: obscure,
-                  keyboardType: inputType,
-                  maxLength: maxLength,
-                  inputFormatters: formatters,
-                  textCapitalization: capitalization,
-                  onChanged: onChanged,
-                  style: TextStyle(
-                    fontSize: AppSizes.fontMD,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextPrimary
-                        : AppColors.lightTextPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    border: InputBorder.none,
-                    isDense: true,
-                    counterText: '',
-                    filled: false,
-                    hintStyle: TextStyle(
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Icon(Icons.settings, color: Colors.white54, size: 22),
+              Text(
+                'WANDERLY',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  letterSpacing: 2,
                 ),
               ),
-              if (suffixIcon != null) suffixIcon!,
             ],
           ),
-        ),
-      ],
+          const Spacer(),
+          Text(
+            number,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              letterSpacing: 2.5,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('CARD HOLDER',
+                      style: TextStyle(
+                          color: Colors.white54, fontSize: 9, letterSpacing: 1)),
+                  Text(holder,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text('EXPIRES',
+                      style: TextStyle(
+                          color: Colors.white54, fontSize: 9, letterSpacing: 1)),
+                  Text(expiry,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ── Input formatters ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX 2 — Card Number Formatter
+//
+// Algorithm:
+//   1. Strip ALL non-digit characters (including previously inserted spaces).
+//   2. Clamp to 16 digits.
+//   3. Re-insert a double space every 4 digits.
+//   4. Place cursor at end.
+//
+// This means spaces are purely cosmetic and never count toward the digit limit.
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _CardNumberFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue old, TextEditingValue newVal) {
-    final digits = newVal.text.replaceAll(' ', '');
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    // Step 1 & 2: digits only, max 16
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final clamped = digits.length > 16 ? digits.substring(0, 16) : digits;
+
+    // Step 3: group into blocks of 4
     final buffer = StringBuffer();
-    for (int i = 0; i < digits.length && i < 16; i++) {
+    for (int i = 0; i < clamped.length; i++) {
       if (i > 0 && i % 4 == 0) buffer.write('  ');
-      buffer.write(digits[i]);
+      buffer.write(clamped[i]);
     }
-    final str = buffer.toString();
+
+    final formatted = buffer.toString();
     return TextEditingValue(
-      text: str,
-      selection: TextSelection.collapsed(offset: str.length),
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Expiry Formatter  MM/YY
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _ExpiryFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue old, TextEditingValue newVal) {
-    final digits = newVal.text.replaceAll('/', '');
-    if (digits.length <= 2) {
-      return newVal.copyWith(
-        text: digits,
-        selection: TextSelection.collapsed(offset: digits.length),
-      );
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final clamped = digits.length > 4 ? digits.substring(0, 4) : digits;
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < clamped.length; i++) {
+      if (i == 2) buffer.write('/');
+      buffer.write(clamped[i]);
     }
-    final str = '${digits.substring(0, 2)}/${digits.substring(2, digits.length.clamp(0, 4))}';
+
+    final formatted = buffer.toString();
     return TextEditingValue(
-      text: str,
-      selection: TextSelection.collapsed(offset: str.length),
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

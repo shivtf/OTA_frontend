@@ -2,13 +2,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_sizes.dart';
-import '../../../core/constants/app_strings.dart';
-import '../../../core/routes/app_routes.dart';
-import '../../../core/theme/theme_controller.dart';
-import '../providers/auth_provider.dart';
-import '../../../app.dart';
+import 'package:wanderly/core/constants/app_colors.dart';
+import 'package:wanderly/core/constants/app_sizes.dart';
+import 'package:wanderly/core/constants/app_strings.dart';
+import 'package:wanderly/core/routes/app_routes.dart';
+import 'package:wanderly/core/theme/theme_controller.dart';
+import 'package:wanderly/features/auth/providers/auth_provider.dart';
+import 'package:wanderly/app.dart' show WanderlyApp;
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
