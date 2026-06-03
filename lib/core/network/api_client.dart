@@ -1,6 +1,5 @@
 // lib/core/network/api_client.dart
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -11,38 +10,57 @@ class ApiClient {
   static const String baseUrl = 'https://ota-jnuy.onrender.com/api/v1';
   static const Duration _timeout = Duration(seconds: 30);
 
-  // ── Token storage keys ───────────────────────────────────────────
   static const _kAccessToken = 'access_token';
   static const _kRefreshToken = 'refresh_token';
 
-  // ── Singleton ────────────────────────────────────────────────────
   ApiClient._();
   static final ApiClient instance = ApiClient._();
 
+  // FIX: Cache SharedPreferences so _headers() never does a disk read
+  // mid-gesture. Initialised once on first use via _prefs getter.
+  SharedPreferences? _prefsCache;
+  Future<SharedPreferences> get _prefs async {
+    _prefsCache ??= await SharedPreferences.getInstance();
+    return _prefsCache!;
+  }
+
+  // FIX: Cache the access token in memory so _headers() is fully synchronous
+  // after the first call. Cleared on logout / 401.
+  String? _cachedAccessToken;
+
+  // ── Refresh deduplication ────────────────────────────────────────
+  Future<void>? _refreshFuture;
+
   // ── Token helpers ────────────────────────────────────────────────
   Future<void> saveTokens(String access, String refresh) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kAccessToken, access);
-    await prefs.setString(_kRefreshToken, refresh);
+    _cachedAccessToken = access; // update memory cache immediately
+    final p = await _prefs;
+    await p.setString(_kAccessToken, access);
+    await p.setString(_kRefreshToken, refresh);
   }
 
   Future<String?> getAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kAccessToken);
+    if (_cachedAccessToken != null) return _cachedAccessToken;
+    final p = await _prefs;
+    _cachedAccessToken = p.getString(_kAccessToken);
+    return _cachedAccessToken;
   }
 
   Future<String?> getRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kRefreshToken);
+    final p = await _prefs;
+    return p.getString(_kRefreshToken);
   }
 
   Future<void> clearTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kAccessToken);
-    await prefs.remove(_kRefreshToken);
+    _cachedAccessToken = null; // clear memory cache
+    final p = await _prefs;
+    await p.remove(_kAccessToken);
+    await p.remove(_kRefreshToken);
   }
 
   // ── Header builder ───────────────────────────────────────────────
+  // FIX: After the first getAccessToken() call this is effectively
+  // synchronous (memory read only), so it never blocks during a gesture.
   Future<Map<String, String>> _headers({bool auth = false}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -55,6 +73,75 @@ class ApiClient {
     return headers;
   }
 
+  // ── Token refresh (deduplicated) ─────────────────────────────────
+  Future<void> _refreshAccessToken() async {
+    if (_refreshFuture != null) {
+      await _refreshFuture;
+      return;
+    }
+    _refreshFuture = _doRefresh();
+    try {
+      await _refreshFuture;
+    } finally {
+      _refreshFuture = null;
+    }
+  }
+
+  Future<void> _doRefresh() async {
+    final refresh = await getRefreshToken();
+    if (refresh == null) throw ApiException('No refresh token', 401);
+
+    final uri = Uri.parse('$baseUrl/auth/refresh');
+    final res = await http
+        .post(
+          uri,
+          headers: await _headers(),
+          body: jsonEncode({'refreshToken': refresh}),
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode == 401) {
+      await clearTokens();
+      throw ApiException('Session expired. Please log in again.', 401);
+    }
+
+    // FIX: parse in background isolate even during refresh
+    final body = await compute(_decodeJson, res.body);
+    final newAccess = body['data']?['token'] as String? ??
+        body['data']?['accessToken'] as String?;
+    if (newAccess == null) throw ApiException('Refresh failed', 401);
+
+    final newRefresh = body['data']?['refreshToken'] as String?;
+    if (newRefresh != null) {
+      await saveTokens(newAccess, newRefresh);
+    } else {
+      _cachedAccessToken = newAccess;
+      final p = await _prefs;
+      await p.setString(_kAccessToken, newAccess);
+    }
+  }
+
+  // ── 401 retry wrapper ────────────────────────────────────────────
+  Future<Map<String, dynamic>> _withRefresh(
+    Future<http.Response> Function() request,
+    Future<http.Response> Function() retry,
+    bool auth,
+  ) async {
+    final response = await request().timeout(_timeout);
+    if (response.statusCode == 401 && auth) {
+      try {
+        await _refreshAccessToken();
+        final retried = await retry().timeout(_timeout);
+        return _parseInBackground(retried);
+      } on ApiException {
+        rethrow;
+      } catch (_) {
+        throw ApiException('Session expired. Please log in again.', 401);
+      }
+    }
+    return _parseInBackground(response);
+  }
+
   // ── Core request methods ─────────────────────────────────────────
   Future<Map<String, dynamic>> get(
     String path, {
@@ -62,10 +149,11 @@ class ApiClient {
     bool auth = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
-    final response = await http
-        .get(uri, headers: await _headers(auth: auth))
-        .timeout(_timeout);
-    return _parse(response);
+    return _withRefresh(
+      () async => http.get(uri, headers: await _headers(auth: auth)),
+      () async => http.get(uri, headers: await _headers(auth: auth)),
+      auth,
+    );
   }
 
   Future<Map<String, dynamic>> post(
@@ -74,14 +162,14 @@ class ApiClient {
     bool auth = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http
-        .post(
-          uri,
-          headers: await _headers(auth: auth),
-          body: jsonEncode(body),
-        )
-        .timeout(_timeout);
-    return _parse(response);
+    final encoded = jsonEncode(body);
+    return _withRefresh(
+      () async =>
+          http.post(uri, headers: await _headers(auth: auth), body: encoded),
+      () async =>
+          http.post(uri, headers: await _headers(auth: auth), body: encoded),
+      auth,
+    );
   }
 
   Future<Map<String, dynamic>> patch(
@@ -90,29 +178,37 @@ class ApiClient {
     bool auth = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http
-        .patch(
-          uri,
-          headers: await _headers(auth: auth),
-          body: jsonEncode(body),
-        )
-        .timeout(_timeout);
-    return _parse(response);
+    final encoded = jsonEncode(body);
+    return _withRefresh(
+      () async =>
+          http.patch(uri, headers: await _headers(auth: auth), body: encoded),
+      () async =>
+          http.patch(uri, headers: await _headers(auth: auth), body: encoded),
+      auth,
+    );
   }
 
-  Future<Map<String, dynamic>> delete(String path, {bool auth = false}) async {
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    bool auth = false,
+  }) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http
-        .delete(uri, headers: await _headers(auth: auth))
-        .timeout(_timeout);
-    return _parse(response);
+    return _withRefresh(
+      () async => http.delete(uri, headers: await _headers(auth: auth)),
+      () async => http.delete(uri, headers: await _headers(auth: auth)),
+      auth,
+    );
   }
 
   // ── Response parser ──────────────────────────────────────────────
-  Map<String, dynamic> _parse(http.Response response) {
+  // FIX: jsonDecode is moved off the main thread via compute().
+  // Previously this ran synchronously on the UI isolate — on a large
+  // booking payload mid-gesture that was enough to freeze the animator.
+  Future<Map<String, dynamic>> _parseInBackground(
+      http.Response response) async {
     Map<String, dynamic> body;
     try {
-      body = jsonDecode(response.body) as Map<String, dynamic>;
+      body = await compute(_decodeJson, response.body);
     } catch (_) {
       throw ApiException('Invalid JSON response', response.statusCode);
     }
@@ -126,7 +222,13 @@ class ApiClient {
   }
 }
 
-// ── Exception ──────────────────────────────────────────────────────
+// ── Top-level function required by compute() ─────────────────────────
+// Must be a top-level or static function — closures are not allowed.
+Map<String, dynamic> _decodeJson(String body) {
+  return jsonDecode(body) as Map<String, dynamic>;
+}
+
+// ── Exception ────────────────────────────────────────────────────────
 class ApiException implements Exception {
   final String message;
   final int statusCode;

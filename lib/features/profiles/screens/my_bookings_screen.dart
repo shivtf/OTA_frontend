@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/network/api_client.dart';
+import 'booking_detail_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -15,34 +16,81 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   bool _loading = true;
   String? _error;
   List<_Booking> _bookings = [];
+  bool _disposed = false;
+  bool _initialLoadDone = false;
+
+  // Static cache so returning to this screen never re-fetches automatically.
+  // Persists across push/pop cycles. Only cleared on explicit refresh.
+  static List<_Booking>? _cachedBookings;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    if (_cachedBookings != null) {
+      // Use cached data immediately — no API call, no jank on return
+      _bookings = _cachedBookings!;
+      _loading = false;
+      _initialLoadDone = true;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Trigger the first load here instead of initState or addPostFrameCallback.
+    // didChangeDependencies runs after the widget is fully attached to the
+    // route, so it never fires mid-gesture or during a transition animation.
+    if (!_initialLoadDone) {
+      _initialLoadDone = true;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _safeSetState(VoidCallback fn) {
+    if (!_disposed && mounted) setState(fn);
   }
 
   Future<void> _load() async {
-    setState(() {
+    _safeSetState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final res = await ApiClient.instance.get('/flights/bookings',
-          query: {'page': '1', 'limit': '10'}, auth: true);
+      final res = await ApiClient.instance.get(
+        '/flights/bookings',
+        query: {'page': '1', 'limit': '10'},
+        auth: true,
+      );
       final data = res['data'] as List<dynamic>? ?? [];
-      setState(() {
-        _bookings = data
-            .map((e) => _Booking.fromJson(e as Map<String, dynamic>))
-            .toList();
+      final bookings = data
+          .map((e) => _Booking.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      // FIX: Update static cache so returning to this screen is instant
+      _cachedBookings = bookings;
+
+      _safeSetState(() {
+        _bookings = bookings;
         _loading = false;
       });
     } catch (e) {
-      setState(() {
+      _safeSetState(() {
         _error = e.toString();
         _loading = false;
       });
     }
+  }
+
+  // FIX: Explicit refresh — clears cache then reloads
+  Future<void> _refresh() async {
+    _cachedBookings = null;
+    await _load();
   }
 
   @override
@@ -120,8 +168,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   ],
                 ),
               ),
+              // FIX: Refresh button now calls _refresh() which clears
+              // the cache first, guaranteeing a real network fetch
               GestureDetector(
-                onTap: _load,
+                onTap: _refresh,
                 child: Container(
                   width: 40,
                   height: 40,
@@ -189,7 +239,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _load,
+                onPressed: _refresh,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
@@ -248,7 +298,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       );
     }
     return RefreshIndicator(
-      onRefresh: _load,
+      // FIX: Pull-to-refresh also clears the cache
+      onRefresh: _refresh,
       color: AppColors.primaryStart,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
@@ -260,7 +311,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   }
 }
 
-// ── Booking Card ────────────────────────────────────────────────────────────
+// ── Booking Card ─────────────────────────────────────────────────────────────
 
 class _BookingCard extends StatelessWidget {
   final _Booking booking;
@@ -354,89 +405,165 @@ class _BookingCard extends StatelessWidget {
     final fb = booking.flightBooking;
     final statusColor = _statusColor(booking.status);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
-        border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4))
-              ],
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => BookingDetailScreen(
+            bookingId: booking.id,
+            bookingRef: booking.bookingRef,
+          ),
+          transitionsBuilder: (_, anim, __, child) => SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1, 0),
+              end: Offset.zero,
+            ).animate(
+                CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+            child: child,
+          ),
+          transitionDuration: const Duration(milliseconds: 320),
+        ),
       ),
-      child: Column(
-        children: [
-          // Top strip: status
-          Container(
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.08),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(AppSizes.radiusLarge),
-                topRight: Radius.circular(AppSizes.radiusLarge),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+          border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4))
+                ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.08),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(AppSizes.radiusLarge),
+                  topRight: Radius.circular(AppSizes.radiusLarge),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(_statusIcon(booking.status),
+                      color: statusColor, size: 15),
+                  const SizedBox(width: 6),
+                  Text(
+                    _statusLabel(booking.status),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    booking.bookingRef,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                Icon(_statusIcon(booking.status), color: statusColor, size: 15),
-                const SizedBox(width: 6),
-                Text(
-                  _statusLabel(booking.status),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: statusColor,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  booking.bookingRef,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Route row
-                Row(
-                  children: [
-                    // Origin
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              fb?.origin ?? '—',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            Text(
+                              _formatTime(fb?.departureTime),
+                              style: TextStyle(
+                                fontSize: AppSizes.fontXS,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
                         children: [
-                          Text(
-                            fb?.origin ?? '—',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: isDark
-                                  ? AppColors.darkTextPrimary
-                                  : AppColors.lightTextPrimary,
-                              letterSpacing: 1,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              fb?.carrier ?? 'XX',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800),
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                      color: AppColors.primaryStart,
+                                      shape: BoxShape.circle)),
+                              Container(
+                                  width: 60,
+                                  height: 1.5,
+                                  color: AppColors.primaryStart
+                                      .withValues(alpha: 0.4)),
+                              Icon(Icons.flight_rounded,
+                                  color: AppColors.primaryStart, size: 16),
+                              Container(
+                                  width: 60,
+                                  height: 1.5,
+                                  color: AppColors.primaryStart
+                                      .withValues(alpha: 0.4)),
+                              Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                      color: AppColors.primaryStart,
+                                      shape: BoxShape.circle)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
                           Text(
-                            _formatTime(fb?.departureTime),
+                            fb?.tripType == 'ONE_WAY'
+                                ? 'One Way'
+                                : 'Round Trip',
                             style: TextStyle(
-                              fontSize: AppSizes.fontXS,
+                              fontSize: 10,
                               color: isDark
                                   ? AppColors.darkTextSecondary
                                   : AppColors.lightTextSecondary,
@@ -444,90 +571,71 @@ class _BookingCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
-
-                    // Flight path
-                    Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            fb?.carrier ?? 'XX',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                    color: AppColors.primaryStart,
-                                    shape: BoxShape.circle)),
-                            Container(
-                              width: 60,
-                              height: 1.5,
-                              color:
-                                  AppColors.primaryStart.withValues(alpha: 0.4),
+                            Text(
+                              fb?.destination ?? '—',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                                letterSpacing: 1,
+                              ),
                             ),
-                            Icon(Icons.flight_rounded,
-                                color: AppColors.primaryStart, size: 16),
-                            Container(
-                              width: 60,
-                              height: 1.5,
-                              color:
-                                  AppColors.primaryStart.withValues(alpha: 0.4),
+                            Text(
+                              _formatDate(fb?.departureTime),
+                              style: TextStyle(
+                                fontSize: AppSizes.fontXS,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightTextSecondary,
+                              ),
                             ),
-                            Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                    color: AppColors.primaryStart,
-                                    shape: BoxShape.circle)),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          fb?.tripType == 'ONE_WAY' ? 'One Way' : 'Round Trip',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                          ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Divider(
+                      color:
+                          isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                      height: 1),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _InfoChip(
+                        icon: Icons.airline_seat_recline_normal_rounded,
+                        label: fb?.cabinClass ?? 'Economy',
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 8),
+                      if (fb?.pnr != null)
+                        _InfoChip(
+                          icon: Icons.confirmation_number_rounded,
+                          label: 'PNR: ${fb!.pnr!}',
+                          isDark: isDark,
                         ),
-                      ],
-                    ),
-
-                    // Destination
-                    Expanded(
-                      child: Column(
+                      const Spacer(),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            fb?.destination ?? '—',
+                            '\$${booking.totalAmount.toStringAsFixed(2)}',
                             style: TextStyle(
-                              fontSize: 22,
+                              fontSize: AppSizes.fontLG,
                               fontWeight: FontWeight.w900,
-                              color: isDark
-                                  ? AppColors.darkTextPrimary
-                                  : AppColors.lightTextPrimary,
-                              letterSpacing: 1,
+                              color: AppColors.primaryStart,
                             ),
                           ),
                           Text(
-                            _formatDate(fb?.departureTime),
+                            booking.currency,
                             style: TextStyle(
-                              fontSize: AppSizes.fontXS,
+                              fontSize: 10,
                               color: isDark
                                   ? AppColors.darkTextSecondary
                                   : AppColors.lightTextSecondary,
@@ -535,61 +643,13 @@ class _BookingCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-                Divider(
-                    color:
-                        isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                    height: 1),
-                const SizedBox(height: 14),
-
-                // Bottom row: cabin + amount
-                Row(
-                  children: [
-                    _InfoChip(
-                      icon: Icons.airline_seat_recline_normal_rounded,
-                      label: fb?.cabinClass ?? 'Economy',
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    if (fb?.pnr != null)
-                      _InfoChip(
-                        icon: Icons.confirmation_number_rounded,
-                        label: 'PNR: ${fb!.pnr!}',
-                        isDark: isDark,
-                      ),
-                    const Spacer(),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '\$${booking.totalAmount.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: AppSizes.fontLG,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.primaryStart,
-                          ),
-                        ),
-                        Text(
-                          booking.currency,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -631,7 +691,7 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-// ── Skeleton ─────────────────────────────────────────────────────────────────
+// ── Skeleton ──────────────────────────────────────────────────────────────────
 
 class _SkeletonCard extends StatelessWidget {
   final bool isDark;
@@ -674,12 +734,10 @@ class _FlightBookingDetail {
   });
 
   factory _FlightBookingDetail.fromJson(Map<String, dynamic> j) {
-    // origin/destination might be JSON strings
     String? parseAirport(dynamic v) {
       if (v == null) return null;
       if (v is String && v.startsWith('{')) {
         try {
-          // crude parse for iataCode
           final match = RegExp(r'"iataCode"\s*:\s*"([^"]+)"').firstMatch(v);
           return match?.group(1);
         } catch (_) {}
@@ -708,6 +766,7 @@ class _Booking {
   final double totalAmount;
   final String currency;
   final _FlightBookingDetail? flightBooking;
+  final DateTime? offerExpiresAt;
 
   _Booking({
     required this.id,
@@ -716,10 +775,18 @@ class _Booking {
     required this.totalAmount,
     required this.currency,
     this.flightBooking,
+    this.offerExpiresAt,
   });
 
   factory _Booking.fromJson(Map<String, dynamic> j) {
     final fbList = j['flight_booking'] as List<dynamic>? ?? [];
+    DateTime? offerExpiry;
+    try {
+      final raw = (fbList.isNotEmpty
+          ? fbList.first as Map<String, dynamic>
+          : null)?['offer_expires_at'] as String?;
+      if (raw != null) offerExpiry = DateTime.parse(raw);
+    } catch (_) {}
     return _Booking(
       id: j['id'] as String? ?? '',
       bookingRef:
@@ -731,6 +798,7 @@ class _Booking {
       flightBooking: fbList.isNotEmpty
           ? _FlightBookingDetail.fromJson(fbList.first as Map<String, dynamic>)
           : null,
+      offerExpiresAt: offerExpiry,
     );
   }
 }
