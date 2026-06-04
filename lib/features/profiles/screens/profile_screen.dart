@@ -60,7 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     return Scaffold(
       backgroundColor:
-      isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: CustomScrollView(
@@ -126,17 +126,17 @@ class _ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final initials = user != null
         ? '${user!.firstName.isNotEmpty ? user!.firstName[0] : ''}${user!.lastName.isNotEmpty ? user!.lastName[0] : ''}'
-        .toUpperCase()
+            .toUpperCase()
         : '?';
 
     return Container(
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-          colors: [Color(0xFF110B2E), Color(0xFF1E183D)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        )
+                colors: [Color(0xFF110B2E), Color(0xFF1E183D)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
             : AppColors.primaryGradient,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(36),
@@ -173,12 +173,12 @@ class _ProfileHeader extends StatelessWidget {
                       ),
                       child: isRefreshing
                           ? const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
+                              padding: EdgeInsets.all(10),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
                           : const Icon(Icons.refresh_rounded,
-                          color: Colors.white, size: 18),
+                              color: Colors.white, size: 18),
                     ),
                   ),
                   GestureDetector(
@@ -446,8 +446,8 @@ class _TravelDocCardState extends State<_TravelDocCard> {
     final visible = number.substring(number.length - 4);
     final masked = '•' * (number.length - 4);
     // Insert a space every 4 chars for readability
-    final maskedFormatted = masked.replaceAllMapped(
-        RegExp(r'.{4}'), (m) => '${m.group(0)} ');
+    final maskedFormatted =
+        masked.replaceAllMapped(RegExp(r'.{4}'), (m) => '${m.group(0)} ');
     return '${maskedFormatted.trim()} $visible';
   }
 
@@ -461,101 +461,87 @@ class _TravelDocCardState extends State<_TravelDocCard> {
       icon: Icons.card_travel_rounded,
       child: has
           ? _InfoRow(
-        icon: Icons.airplane_ticket_outlined,
-        label: 'Passport Number',
-        value: _showPassport
-            ? widget.user.passportNumber!
-            : _maskedPassport(widget.user.passportNumber!),
-        isDark: isDark,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onTap: () => setState(() => _showPassport = !_showPassport),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryStart.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _showPassport
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      size: 12,
-                      color: AppColors.primaryStart,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _showPassport ? 'Hide' : 'Show',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryStart),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text('On file',
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.success)),
-            ),
-          ],
-        ),
-      )
-          : Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.warning_amber_rounded,
-                  color: AppColors.warning, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              icon: Icons.airplane_ticket_outlined,
+              label: 'Passport Number',
+              value: _showPassport
+                  ? widget.user.passportNumber!
+                  : _maskedPassport(widget.user.passportNumber!),
+              isDark: isDark,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('No passport on file',
-                      style: TextStyle(
-                          fontSize: AppSizes.fontSM,
-                          fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? AppColors.darkTextPrimary
-                              : AppColors.lightTextPrimary)),
-                  Text('Add your passport to speed up booking',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightTextSecondary)),
+                  GestureDetector(
+                    onTap: () => setState(() => _showPassport = !_showPassport),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryStart.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _showPassport
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            size: 12,
+                            color: AppColors.primaryStart,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _showPassport ? 'Hide' : 'Show',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primaryStart),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.warning_amber_rounded,
+                        color: AppColors.warning, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('No passport on file',
+                            style: TextStyle(
+                                fontSize: AppSizes.fontSM,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary)),
+                        Text('Add your passport to speed up booking',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightTextSecondary)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -678,7 +664,7 @@ class _LogoutTile extends StatelessWidget {
                   color: AppColors.error.withValues(alpha: 0.1),
                   shape: BoxShape.circle),
               child:
-              Icon(Icons.logout_rounded, color: AppColors.error, size: 28),
+                  Icon(Icons.logout_rounded, color: AppColors.error, size: 28),
             ),
             const SizedBox(height: 16),
             Text('Sign Out?',
@@ -706,7 +692,7 @@ class _LogoutTile extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       minimumSize:
-                      const Size(double.infinity, AppSizes.buttonHeightSM),
+                          const Size(double.infinity, AppSizes.buttonHeightSM),
                       side: BorderSide(
                           color: isDark
                               ? AppColors.darkBorder
@@ -736,7 +722,7 @@ class _LogoutTile extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.error,
                       minimumSize:
-                      const Size(double.infinity, AppSizes.buttonHeightSM),
+                          const Size(double.infinity, AppSizes.buttonHeightSM),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                       elevation: 0,
@@ -769,7 +755,7 @@ class _LogoutTile extends StatelessWidget {
                   color: AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10)),
               child:
-              Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
+                  Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -811,7 +797,7 @@ class _SkeletonCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: List.generate(
           4,
-              (i) => Padding(
+          (i) => Padding(
             padding: const EdgeInsets.only(bottom: 14),
             child: Row(
               children: [
@@ -872,11 +858,11 @@ class _SectionCard extends StatelessWidget {
         boxShadow: isDark
             ? null
             : [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4))
-        ],
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
