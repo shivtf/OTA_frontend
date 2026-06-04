@@ -10,6 +10,7 @@ class GradientButton extends StatefulWidget {
   final double borderRadius;
   final bool isLoading;
   final IconData? icon;
+  final double fontSize;
 
   const GradientButton({
     super.key,
@@ -20,6 +21,7 @@ class GradientButton extends StatefulWidget {
     this.borderRadius = AppSizes.radiusMedium,
     this.isLoading = false,
     this.icon,
+    this.fontSize = AppSizes.fontMD,
   });
 
   @override
@@ -100,8 +102,8 @@ class _GradientButtonState extends State<GradientButton>
                 ],
                 Text(
                   widget.text,
-                  style: const TextStyle(
-                    fontSize: AppSizes.fontMD,
+                  style: TextStyle(
+                    fontSize: widget.fontSize,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                     letterSpacing: 0.5,

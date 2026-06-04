@@ -116,14 +116,14 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
       if (_isLoadingDetails || _fetchError == null) {
         return Scaffold(
           backgroundColor:
-              isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
           body: const Center(child: CircularProgressIndicator()),
         );
       }
       // Fetch failed and no seed offer available
       return Scaffold(
         backgroundColor:
-            isDark ? AppColors.darkBackground : AppColors.lightBackground,
+        isDark ? AppColors.darkBackground : AppColors.lightBackground,
         body: SafeArea(
           child: Column(
             children: [
@@ -167,7 +167,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
 
     return Scaffold(
       backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SlideTransition(
@@ -224,10 +224,10 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              )
+          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        )
             : AppColors.primaryGradient,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(32),
@@ -305,7 +305,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                 Container(
                   margin: const EdgeInsets.only(bottom: 20),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
@@ -327,10 +327,10 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                           logoUrl: offer.airlineLogoUrl.isNotEmpty
                               ? offer.airlineLogoUrl
                               : (offer.outbound.segments.isNotEmpty
-                                  ? offer.outbound.segments.first
-                                          .marketingCarrier?.logoUrl ??
-                                      ''
-                                  : ''),
+                              ? offer.outbound.segments.first
+                              .marketingCarrier?.logoUrl ??
+                              ''
+                              : ''),
                           size: 28,
                           fallbackIcon: Icons.airlines_rounded,
                         ),
@@ -518,7 +518,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
         'icon': Icons.airline_seat_recline_extra_rounded,
         'label': 'Segments',
         'value':
-            '${offer.outbound.segments.length} segment${offer.outbound.segments.length > 1 ? 's' : ''}',
+        '${offer.outbound.segments.length} segment${offer.outbound.segments.length > 1 ? 's' : ''}',
       },
       {
         'icon': Icons.access_time_rounded,
@@ -661,16 +661,12 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                     ),
                   ),
                   const Spacer(),
-                  ShaderMask(
-                    shaderCallback: (b) =>
-                        AppColors.primaryGradient.createShader(b),
-                    child: Text(
-                      '${pricing.totalCurrency} ${grandTotal.toStringAsFixed(2)}', // ← live
-                      style: const TextStyle(
-                        fontSize: AppSizes.fontXXL,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
+                  Text(
+                    '${pricing.totalCurrency} ${grandTotal.toStringAsFixed(2)}', // ← live
+                    style: TextStyle(
+                      fontSize: AppSizes.fontMD,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppColors.primaryStart,
                     ),
                   ),
                 ],
@@ -702,7 +698,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
                 alignment: Alignment.centerLeft,
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -765,10 +761,10 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
         label: 'Wi-Fi',
         value: available
             ? (cost == 'free'
-                ? 'Free'
-                : cost == 'paid'
-                    ? 'Paid'
-                    : 'Available')
+            ? 'Free'
+            : cost == 'paid'
+            ? 'Paid'
+            : 'Available')
             : 'Not available',
         positive: available,
       ));
@@ -878,7 +874,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
     final pax = seg.passengers.isNotEmpty ? seg.passengers.first : null;
     final baggages = pax?.baggages ?? [];
     final extraBagService =
-        offer.availableServices.where((s) => s.type == 'baggage').toList();
+    offer.availableServices.where((s) => s.type == 'baggage').toList();
 
     if (baggages.isEmpty && extraBagService.isEmpty) {
       return const SizedBox.shrink();
@@ -978,7 +974,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
               final maxQty = svc.maximumQuantity ?? 1;
               return Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: AppColors.primaryStart.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
@@ -1096,8 +1092,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
             label: 'Cancellation',
             value: isRefundable
                 ? refundPenalty != null
-                    ? 'Refundable · Penalty: $refundPenalty'
-                    : 'Free cancellation'
+                ? 'Refundable · Penalty: $refundPenalty'
+                : 'Free cancellation'
                 : 'Non-refundable',
             positive: isRefundable,
             isDark: isDark,
@@ -1108,8 +1104,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
             label: 'Date Change',
             value: isChangeable
                 ? changePenalty != null
-                    ? 'Changeable · Fee: $changePenalty'
-                    : 'Date change allowed'
+                ? 'Changeable · Fee: $changePenalty'
+                : 'Date change allowed'
                 : 'Not changeable',
             positive: isChangeable,
             isDark: isDark,
@@ -1145,8 +1141,8 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
           final label = type == 'adult'
               ? 'Adult ${e.key + 1}'
               : type == 'child'
-                  ? 'Child ${e.key + 1}'
-                  : 'Infant ${e.key + 1}';
+              ? 'Child ${e.key + 1}'
+              : 'Infant ${e.key + 1}';
           return label;
         }).toList();
 
@@ -1158,7 +1154,7 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
             'offerId': offer.offerId,
             'flightInfo': flightInfo,
             'passengerCount':
-                offer.passengers.isNotEmpty ? offer.passengers.length : 1,
+            offer.passengers.isNotEmpty ? offer.passengers.length : 1,
             'passengerNames': passengerNames,
             'passengerDuffelIds': passengerDuffelIds,
           },
@@ -1240,47 +1236,48 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
 
         return Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total price',
-                  style: TextStyle(
-                    fontSize: AppSizes.fontSM,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
-                  ),
-                ),
-                ShaderMask(
-                  shaderCallback: (b) =>
-                      AppColors.primaryGradient.createShader(b),
-                  child: Text(
-                    '${offer.currency} ${total.toStringAsFixed(2)}', // ← live total
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontXXL,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                // Show seat upgrade line when seats are selected
-                if (seatUpgrade > 0)
-                  Text(
-                    'incl. ${offer.currency} ${seatUpgrade.toStringAsFixed(2)} seat upgrade',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.primaryStart,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 20),
             Expanded(
+              flex: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Total price',
+                    style: TextStyle(
+                      fontSize: AppSizes.fontMD,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  Text(
+                    '${offer.currency} ${total.toStringAsFixed(2)}', // ← live total
+                    style: TextStyle(
+                      fontSize: AppSizes.fontLG,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppColors.primaryStart,
+                    ),
+                  ),
+                  // Show seat upgrade line when seats are selected
+                  if (seatUpgrade > 0)
+                    Text(
+                      'incl. ${offer.currency} ${seatUpgrade.toStringAsFixed(2)} seat upgrade',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.primaryStart,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
               child: GradientButton(
                 text: 'Initialize Booking',
                 icon: Icons.person_add_rounded,
+                height: AppSizes.buttonHeightSM,
                 onPressed: () => _showPassengerForm(context, offer, isDark),
               ),
             ),
@@ -1368,11 +1365,11 @@ class _FlightDetailsScreenState extends State<FlightDetailsScreen>
     try {
       final d = Duration(
         hours:
-            int.tryParse(RegExp(r'(\d+)H').firstMatch(iso)?.group(1) ?? '0') ??
-                0,
+        int.tryParse(RegExp(r'(\d+)H').firstMatch(iso)?.group(1) ?? '0') ??
+            0,
         minutes:
-            int.tryParse(RegExp(r'(\d+)M').firstMatch(iso)?.group(1) ?? '0') ??
-                0,
+        int.tryParse(RegExp(r'(\d+)M').firstMatch(iso)?.group(1) ?? '0') ??
+            0,
       );
       final h = d.inHours;
       final m = d.inMinutes.remainder(60);
@@ -1509,7 +1506,7 @@ class _SegmentTimelineItem extends StatelessWidget {
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColors.primaryStart.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(6),
@@ -1765,12 +1762,12 @@ class _Section extends StatelessWidget {
         boxShadow: isDark
             ? null
             : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1814,9 +1811,9 @@ class _PriceRow extends StatelessWidget {
 
   const _PriceRow(
       {required this.label,
-      required this.amount,
-      required this.currency,
-      required this.isDark});
+        required this.amount,
+        required this.currency,
+        required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -1929,23 +1926,23 @@ class _ConfirmItem extends StatelessWidget {
         const SizedBox(height: 4),
         highlight
             ? ShaderMask(
-                shaderCallback: (b) =>
-                    AppColors.primaryGradient.createShader(b),
-                child: Text(value,
-                    style: const TextStyle(
-                      fontSize: AppSizes.fontLG,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    )),
-              )
+          shaderCallback: (b) =>
+              AppColors.primaryGradient.createShader(b),
+          child: Text(value,
+              style: const TextStyle(
+                fontSize: AppSizes.fontLG,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              )),
+        )
             : Text(value,
-                style: TextStyle(
-                  fontSize: AppSizes.fontLG,
-                  fontWeight: FontWeight.w800,
-                  color: isDark
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightTextPrimary,
-                )),
+            style: TextStyle(
+              fontSize: AppSizes.fontLG,
+              fontWeight: FontWeight.w800,
+              color: isDark
+                  ? AppColors.darkTextPrimary
+                  : AppColors.lightTextPrimary,
+            )),
       ],
     );
   }
@@ -2096,7 +2093,7 @@ class _AirlineSegmentCard extends StatelessWidget {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color:
-                                  AppColors.primaryStart.withValues(alpha: 0.1),
+                              AppColors.primaryStart.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -2168,7 +2165,7 @@ class _AirlineSegmentCard extends StatelessWidget {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color:
-                                  AppColors.primaryStart.withValues(alpha: 0.1),
+                              AppColors.primaryStart.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -2277,12 +2274,12 @@ class _CarrierRow extends StatelessWidget {
             boxShadow: isDark
                 ? null
                 : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    )
-                  ],
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              )
+            ],
           ),
           padding: const EdgeInsets.all(6),
           child: _AirlineLogo(
