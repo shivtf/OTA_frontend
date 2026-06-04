@@ -1,6 +1,7 @@
 // lib/features/flights/screens/passenger_form_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
@@ -91,7 +92,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     _genders = List.generate(count, (_) => 'male');
     _passengerTypes = List.generate(
       count,
-      (i) => _offerPassengers[i].type,
+          (i) => _offerPassengers[i].type,
     );
   }
 
@@ -147,7 +148,9 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
         dateOfBirth: ctrl.dob.text.trim(),
         gender: _genders[i] == 'male' ? 'MALE' : 'FEMALE',
         email: ctrl.email.text.trim(),
-        phone: ctrl.phone.text.trim(),
+        phone: ctrl.completePhone.isNotEmpty
+            ? ctrl.completePhone
+            : ctrl.phone.text.trim(),
         passportNumber: ctrl.passport.text.trim().isEmpty
             ? null
             : ctrl.passport.text.trim(),
@@ -166,7 +169,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
       // can rebuild this screen mid-submit and prevent navigation.
       // Instead, set _selectedOffer directly and call initBooking ourselves.
       final provider =
-          Provider.of<FlightBookingProvider>(context, listen: false);
+      Provider.of<FlightBookingProvider>(context, listen: false);
 
       // Manually set the offer on the shared provider without notifying listeners
       provider.setOfferSilently(_offer!);
@@ -187,7 +190,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
             'offer': _offer,
             'passengers': passengers,
             'seatSelections':
-                provider.seatSelections, // ← correct key + rich data
+            provider.seatSelections, // ← correct key + rich data
           },
         );
       } else {
@@ -229,9 +232,9 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.lightBackground;
     final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return Scaffold(
       backgroundColor: bg,
@@ -256,7 +259,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
                   child: _offerPassengers.isEmpty
                       ? const Center(child: CircularProgressIndicator())
                       : _buildPassengerForm(_currentPassengerIndex, isDark,
-                          textPrimary, textSecondary),
+                      textPrimary, textSecondary),
                 ),
               ),
             ),
@@ -330,8 +333,8 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     final typeLabel = type == 'adult'
         ? 'Adult'
         : type == 'child'
-            ? 'Child'
-            : 'Infant';
+        ? 'Child'
+        : 'Infant';
     return '${index + 1}. $typeLabel';
   }
 
@@ -542,7 +545,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
               borderRadius: BorderRadius.circular(10),
             ),
             child:
-                const Icon(Icons.flight_rounded, color: Colors.white, size: 18),
+            const Icon(Icons.flight_rounded, color: Colors.white, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -632,7 +635,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
                 icon: Icons.badge_rounded,
                 isDark: isDark,
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
             ),
             const SizedBox(width: 12),
@@ -644,7 +647,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
                 icon: Icons.badge_outlined,
                 isDark: isDark,
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
             ),
           ],
@@ -697,18 +700,97 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
           },
         ),
         const SizedBox(height: 12),
-        _InputField(
+        IntlPhoneField(
           controller: ctrl.phone,
-          label: 'Phone Number',
-          hint: '+919876543210',
-          icon: Icons.phone_rounded,
-          isDark: isDark,
+          initialCountryCode: 'IN',
           keyboardType: TextInputType.phone,
-          validator: (v) {
-            if (v == null || v.trim().isEmpty) return 'Required';
-            if (v.trim().length < 8) return 'Enter a valid phone number';
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          onChanged: (phone) {
+            ctrl.completePhone = phone.completeNumber;
+          },
+          validator: (phone) {
+            if (phone == null || phone.number.trim().isEmpty) return 'Required';
+            if (phone.number.trim().length != 10) return 'Must be 10 digits';
             return null;
           },
+          decoration: InputDecoration(
+            labelText: 'Phone Number',
+            hintText: '9876543210',
+            labelStyle: TextStyle(
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+              fontSize: AppSizes.fontSM,
+            ),
+            hintStyle: TextStyle(
+              color: (isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary)
+                  .withValues(alpha: 0.5),
+              fontSize: AppSizes.fontSM,
+            ),
+            filled: true,
+            fillColor:
+            isDark ? AppColors.darkInputBg : AppColors.lightInputBg,
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? AppColors.darkBorder
+                      : AppColors.lightBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                  color: isDark
+                      ? AppColors.darkBorder
+                      : AppColors.lightBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                  color: AppColors.primaryStart, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+              const BorderSide(color: AppColors.error, width: 1.5),
+            ),
+            errorStyle:
+            const TextStyle(fontSize: 10, color: AppColors.error),
+            counterText: '',
+          ),
+          style: TextStyle(
+            color: isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary,
+            fontSize: AppSizes.fontMD,
+            fontWeight: FontWeight.w500,
+          ),
+          dropdownTextStyle: TextStyle(
+            color: isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary,
+            fontSize: AppSizes.fontSM,
+            fontWeight: FontWeight.w600,
+          ),
+          dropdownDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          ),
+          dropdownIconPosition: IconPosition.trailing,
+          dropdownIcon: const Icon(Icons.expand_more_rounded,
+              size: 18, color: AppColors.primaryStart),
+          flagsButtonPadding: const EdgeInsets.symmetric(horizontal: 10),
         ),
       ],
     );
@@ -768,11 +850,11 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
   // ── Date Picker ────────────────────────────────────────────────────────────
 
   Future<void> _pickDate(
-    BuildContext context,
-    TextEditingController ctrl, {
-    DateTime? firstDate,
-    DateTime? lastDate,
-  }) async {
+      BuildContext context,
+      TextEditingController ctrl, {
+        DateTime? firstDate,
+        DateTime? lastDate,
+      }) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -790,7 +872,7 @@ class _PassengerFormScreenState extends State<PassengerFormScreen>
     );
     if (picked != null) {
       ctrl.text =
-          '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     }
   }
 }
@@ -807,6 +889,9 @@ class _PassengerControllers {
   final passport = TextEditingController();
   final passportExpiry = TextEditingController();
   final nationality = TextEditingController(text: 'IN');
+
+  /// Full phone number including dial code, set by IntlPhoneField
+  String completePhone = '';
 
   void dispose() {
     firstName.dispose();
@@ -840,8 +925,8 @@ class _PassengerProgressHeader extends StatelessWidget {
     final typeLabel = type == 'adult'
         ? 'Adult'
         : type == 'child'
-            ? 'Child'
-            : 'Infant';
+        ? 'Child'
+        : 'Infant';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -903,7 +988,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
 
     return Row(
       children: [
@@ -980,9 +1065,9 @@ class _InputField extends StatelessWidget {
     final inputBg = isDark ? AppColors.darkInputBg : AppColors.lightInputBg;
     final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return TextFormField(
       controller: controller,
@@ -1009,7 +1094,7 @@ class _InputField extends StatelessWidget {
         filled: true,
         fillColor: inputBg,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: border),
@@ -1021,7 +1106,7 @@ class _InputField extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide:
-              const BorderSide(color: AppColors.primaryStart, width: 1.5),
+          const BorderSide(color: AppColors.primaryStart, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1036,6 +1121,8 @@ class _InputField extends StatelessWidget {
     );
   }
 }
+
+
 
 class _DropdownField extends StatelessWidget {
   final String label;
@@ -1059,9 +1146,9 @@ class _DropdownField extends StatelessWidget {
     final inputBg = isDark ? AppColors.darkInputBg : AppColors.lightInputBg;
     final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
     final textPrimary =
-        isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
     final textSecondary =
-        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
 
     return DropdownButtonFormField<String>(
       initialValue: value,
@@ -1080,7 +1167,7 @@ class _DropdownField extends StatelessWidget {
         filled: true,
         fillColor: inputBg,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: border),
@@ -1092,14 +1179,14 @@ class _DropdownField extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide:
-              const BorderSide(color: AppColors.primaryStart, width: 1.5),
+          const BorderSide(color: AppColors.primaryStart, width: 1.5),
         ),
       ),
       items: items
           .map((item) => DropdownMenuItem(
-                value: item,
-                child: Text(displayLabels[item] ?? item),
-              ))
+        value: item,
+        child: Text(displayLabels[item] ?? item),
+      ))
           .toList(),
     );
   }

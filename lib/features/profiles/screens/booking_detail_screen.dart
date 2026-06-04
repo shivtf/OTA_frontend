@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../flights/screens/cancel_booking_screen.dart';
+import '../../flights/change_request/widgets/change_flight_button.dart';
 import 'eticket_screen.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/network/api_client.dart';
@@ -109,24 +110,28 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   bool get _isCancellable =>
       ['CONFIRMED', 'PENDING_PAYMENT', 'PAYMENT_PROCESSING'].contains(_status);
 
+  bool get _isChangeable =>
+      _isConfirmed &&
+          ((_booking?['conditions'] as Map<String, dynamic>?)?['changeable'] as bool? ?? false);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor:
-          _isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      _isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: Column(
         children: [
           _buildHeader(context),
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primaryStart,
-                    ),
-                  )
+              child: CircularProgressIndicator(
+                color: AppColors.primaryStart,
+              ),
+            )
                 : _error != null
-                    ? _buildError()
-                    : _buildBody(),
+                ? _buildError()
+                : _buildBody(),
           ),
           if (!_loading && _error == null && _booking != null)
             _buildBottomActions(),
@@ -142,10 +147,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       decoration: BoxDecoration(
         gradient: _isDark
             ? const LinearGradient(
-                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              )
+          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        )
             : AppColors.primaryGradient,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(28),
@@ -167,7 +172,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                     border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: const Icon(Icons.arrow_back_rounded,
                       color: Colors.white, size: 20),
@@ -256,7 +261,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 backgroundColor: AppColors.primaryStart,
                 foregroundColor: Colors.white,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
@@ -304,7 +309,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           _buildSectionTitle('Flight Details'),
           const SizedBox(height: 12),
           ...slices.asMap().entries.map(
-              (e) => _buildSliceCard(e.value as Map<String, dynamic>, e.key)),
+                  (e) => _buildSliceCard(e.value as Map<String, dynamic>, e.key)),
           const SizedBox(height: 20),
         ] else ...[
           // Fallback for test/manual bookings with no Duffel data
@@ -327,7 +332,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           _buildSectionTitle('Passengers'),
           const SizedBox(height: 12),
           ...passengers.map(
-              (p) => _buildPassengerCard(p as Map<String, dynamic>, slices)),
+                  (p) => _buildPassengerCard(p as Map<String, dynamic>, slices)),
           const SizedBox(height: 20),
         ],
 
@@ -528,7 +533,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       if (segments.isNotEmpty)
                         Text(
                           (segments.first as Map<String, dynamic>?)?[
-                                  'marketingCarrier']?['iataCode'] as String? ??
+                          'marketingCarrier']?['iataCode'] as String? ??
                               '—',
                           style: const TextStyle(
                             color: Colors.white,
@@ -950,7 +955,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     // FIX: Normalise gender — backend sends uppercase e.g. "FEMALE"
     final rawGender = p['gender'] as String?;
     final gender =
-        rawGender != null ? _capitalize(rawGender.toLowerCase()) : null;
+    rawGender != null ? _capitalize(rawGender.toLowerCase()) : null;
 
     final List<String> seats = [];
     for (final slice in slices) {
@@ -985,7 +990,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               shape: BoxShape.circle,
             ),
             child:
-                const Icon(Icons.person_rounded, color: Colors.white, size: 22),
+            const Icon(Icons.person_rounded, color: Colors.white, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1205,25 +1210,25 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           _policyRow(
             icon:
-                refundable ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            refundable ? Icons.check_circle_rounded : Icons.cancel_rounded,
             color: refundable ? AppColors.success : AppColors.error,
             label: 'Refundable',
             value: refundable
                 ? (refundPenalty != null
-                    ? 'Penalty: $currency $refundPenalty'
-                    : 'Yes')
+                ? 'Penalty: $currency $refundPenalty'
+                : 'Yes')
                 : 'Non-refundable',
           ),
           const Divider(height: 20),
           _policyRow(
             icon:
-                changeable ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            changeable ? Icons.check_circle_rounded : Icons.cancel_rounded,
             color: changeable ? AppColors.success : AppColors.error,
             label: 'Changeable',
             value: changeable
                 ? (changePenalty != null
-                    ? 'Penalty: $currency $changePenalty'
-                    : 'Yes')
+                ? 'Penalty: $currency $changePenalty'
+                : 'Yes')
                 : 'Non-changeable',
           ),
         ],
@@ -1266,7 +1271,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   // ── Bottom Actions ──────────────────────────────────────────────────────────
 
   Widget _buildBottomActions() {
-    if (!_isConfirmed && !_isCancellable) return const SizedBox.shrink();
+    if (!_isChangeable && !_isCancellable) return const SizedBox.shrink();
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -1279,137 +1284,150 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ),
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (_isCancellable) ...[
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final b = _booking!;
-                  final slices = b['slices'] as List<dynamic>? ?? [];
-                  String flightInfo = widget.bookingRef;
-                  if (slices.isNotEmpty) {
-                    final s = slices.first as Map<String, dynamic>;
-                    final origin = (s['origin']
-                            as Map<String, dynamic>?)?['iataCode'] as String? ??
-                        '--';
-                    final dest = (s['destination']
-                            as Map<String, dynamic>?)?['iataCode'] as String? ??
-                        '--';
-                    final dep = s['departureAt'] as String?;
-                    String dateStr = '';
-                    if (dep != null) {
-                      try {
-                        final dt = DateTime.parse(dep).toLocal();
-                        const months = [
-                          '',
-                          'Jan',
-                          'Feb',
-                          'Mar',
-                          'Apr',
-                          'May',
-                          'Jun',
-                          'Jul',
-                          'Aug',
-                          'Sep',
-                          'Oct',
-                          'Nov',
-                          'Dec'
-                        ];
-                        dateStr = ' · ${dt.day} ${months[dt.month]}';
-                      } catch (_) {}
-                    }
-                    flightInfo = '$origin → $dest$dateStr';
-                  }
-
-                  await Navigator.of(context).push(
-                    PageRouteBuilder(
-                      pageBuilder: (_, __, ___) => CancelBookingScreen(
-                        bookingId: widget.bookingId,
-                        bookingRef: widget.bookingRef,
-                        flightInfo: flightInfo,
-                      ),
-                      transitionsBuilder: (_, anim, __, child) =>
-                          SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(1, 0),
-                          end: Offset.zero,
-                        ).animate(CurvedAnimation(
-                            parent: anim, curve: Curves.easeOutCubic)),
-                        child: child,
-                      ),
-                      transitionDuration: const Duration(milliseconds: 320),
-                    ),
-                  );
-
-                  // Reload booking after returning — status may now be CANCELLED
-                  _load();
-                },
-                icon: const Icon(Icons.cancel_outlined, size: 18),
-                label: const Text(
-                  'Cancel Booking',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: AppSizes.fontSM),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.error),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
+          // Change Flight button — only visible for CONFIRMED + changeable bookings
+          if (_isChangeable) ...[
+            ChangeFlightButton(
+              bookingId: widget.bookingId,
+              bookingStatus: _status,
             ),
-            if (_isConfirmed) const SizedBox(width: 12),
+            const SizedBox(height: 10),
           ],
-          if (_isConfirmed)
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _viewingTicket ? null : _viewTicket,
-                icon: _viewingTicket
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.confirmation_number_outlined, size: 18),
-                label: const Text(
-                  'View Ticket',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: AppSizes.fontSM),
+          Row(
+            children: [
+              if (_isCancellable) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final b = _booking!;
+                      final slices = b['slices'] as List<dynamic>? ?? [];
+                      String flightInfo = widget.bookingRef;
+                      if (slices.isNotEmpty) {
+                        final s = slices.first as Map<String, dynamic>;
+                        final origin = (s['origin']
+                        as Map<String, dynamic>?)?['iataCode'] as String? ??
+                            '--';
+                        final dest = (s['destination']
+                        as Map<String, dynamic>?)?['iataCode'] as String? ??
+                            '--';
+                        final dep = s['departureAt'] as String?;
+                        String dateStr = '';
+                        if (dep != null) {
+                          try {
+                            final dt = DateTime.parse(dep).toLocal();
+                            const months = [
+                              '',
+                              'Jan',
+                              'Feb',
+                              'Mar',
+                              'Apr',
+                              'May',
+                              'Jun',
+                              'Jul',
+                              'Aug',
+                              'Sep',
+                              'Oct',
+                              'Nov',
+                              'Dec'
+                            ];
+                            dateStr = ' · ${dt.day} ${months[dt.month]}';
+                          } catch (_) {}
+                        }
+                        flightInfo = '$origin → $dest$dateStr';
+                      }
+
+                      await Navigator.of(context).push(
+                        PageRouteBuilder(
+                          pageBuilder: (_, __, ___) => CancelBookingScreen(
+                            bookingId: widget.bookingId,
+                            bookingRef: widget.bookingRef,
+                            flightInfo: flightInfo,
+                          ),
+                          transitionsBuilder: (_, anim, __, child) =>
+                              SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(1, 0),
+                                  end: Offset.zero,
+                                ).animate(CurvedAnimation(
+                                    parent: anim, curve: Curves.easeOutCubic)),
+                                child: child,
+                              ),
+                          transitionDuration: const Duration(milliseconds: 320),
+                        ),
+                      );
+
+                      // Reload booking after returning — status may now be CANCELLED
+                      _load();
+                    },
+                    icon: const Icon(Icons.cancel_outlined, size: 18),
+                    label: const Text(
+                      'Cancel Booking',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: AppSizes.fontSM),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryStart,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
+                if (_isConfirmed) const SizedBox(width: 12),
+              ],
+              if (_isConfirmed)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _viewingTicket ? null : _viewTicket,
+                    icon: _viewingTicket
+                        ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                        : const Icon(Icons.confirmation_number_outlined, size: 18),
+                    label: const Text(
+                      'View Ticket',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: AppSizes.fontSM),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryStart,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                  ),
                 ),
-              ),
-            ),
+            ],
+          ),  // end Row
         ],
-      ),
+      ),      // end Column
     );
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   BoxDecoration _cardDecoration() => BoxDecoration(
-        color: _isDark ? AppColors.darkCard : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
-        border: Border.all(
-            color: _isDark ? AppColors.darkBorder : AppColors.lightBorder),
-        boxShadow: _isDark
-            ? null
-            : [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4))
-              ],
-      );
+    color: _isDark ? AppColors.darkCard : AppColors.lightCard,
+    borderRadius: BorderRadius.circular(AppSizes.radiusLarge),
+    border: Border.all(
+        color: _isDark ? AppColors.darkBorder : AppColors.lightBorder),
+    boxShadow: _isDark
+        ? null
+        : [
+      BoxShadow(
+          color: Colors.black.withValues(alpha: 0.05),
+          blurRadius: 16,
+          offset: const Offset(0, 4))
+    ],
+  );
 
   Widget _detailChip(IconData icon, String label) {
     return Container(
@@ -1458,8 +1476,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               color: highlight
                   ? AppColors.primaryStart
                   : (_isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary)),
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary)),
           const SizedBox(width: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1478,8 +1496,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     color: highlight
                         ? AppColors.primaryStart
                         : (_isDark
-                            ? AppColors.darkTextPrimary
-                            : AppColors.lightTextPrimary),
+                        ? AppColors.darkTextPrimary
+                        : AppColors.lightTextPrimary),
                   )),
             ],
           ),
@@ -1628,3 +1646,4 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 }
+

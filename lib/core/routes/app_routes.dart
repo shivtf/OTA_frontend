@@ -7,6 +7,9 @@
 //   • /flights/seat-map      — seat selection screen
 //   • Deep link handler via onGenerateRoute parsing
 
+import 'package:provider/provider.dart';
+import '../../features/flights/change_request/providers/flight_change_provider.dart';
+import '../../features/flights/change_request/screens/flight_change_screen.dart';
 import 'package:flutter/material.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
@@ -29,6 +32,7 @@ import '../../features/cars/screens/car_results_screen.dart';
 import '../../features/cars/screens/car_details_screen.dart';
 import '../../features/payment/screens/payment_screen.dart';
 import '../../features/payment/screens/payment_success_screen.dart';
+
 
 class AppRoutes {
   AppRoutes._();
@@ -54,6 +58,7 @@ class AppRoutes {
   static const String carDetails = '/cars/details';
   static const String payment = '/payment';
   static const String paymentSuccess = '/payment/success';
+  static const String flightChange = '/flights/change';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     // ── Deep link: otaapp://auth/verified?status=success ──────────────────────
@@ -138,6 +143,16 @@ class AppRoutes {
         return _slideUp(const PaymentScreen(), settings);
       case paymentSuccess:
         return _fade(const PaymentSuccessScreen(), settings);
+      case flightChange:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        final bookingId = args['bookingId'] as String? ?? '';
+        return _slide(
+          ChangeNotifierProvider(
+            create: (_) => FlightChangeProvider(),
+            child: FlightChangeScreen(bookingId: bookingId),
+          ),
+          settings,
+        );
       default:
         return _fade(const SplashScreen(), settings);
     }

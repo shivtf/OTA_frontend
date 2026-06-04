@@ -26,8 +26,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   @override
   void initState() {
     super.initState();
-    if (_cachedBookings != null) {
-      // Use cached data immediately — no API call, no jank on return
+    // Only use cache if it actually has data (non-null AND non-empty).
+    // An empty/null cache means we haven't successfully loaded yet
+    // and must fetch from the API when the screen opens.
+    if (_cachedBookings != null && _cachedBookings!.isNotEmpty) {
       _bookings = _cachedBookings!;
       _loading = false;
       _initialLoadDone = true;
@@ -99,7 +101,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: Column(
         children: [
           _buildHeader(isDark, context),
@@ -114,10 +116,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       decoration: BoxDecoration(
         gradient: isDark
             ? const LinearGradient(
-                colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              )
+          colors: [Color(0xFF110B2E), Color(0xFF1A1635)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        )
             : AppColors.primaryGradient,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(28),
@@ -139,7 +141,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                     border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: const Icon(Icons.arrow_back_rounded,
                       color: Colors.white, size: 20),
@@ -246,7 +248,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   backgroundColor: AppColors.primaryStart,
                   foregroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
@@ -433,11 +435,11 @@ class _BookingCard extends StatelessWidget {
           boxShadow: isDark
               ? null
               : [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4))
-                ],
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 4))
+          ],
         ),
         child: Column(
           children: [
@@ -603,7 +605,7 @@ class _BookingCard extends StatelessWidget {
                   const SizedBox(height: 14),
                   Divider(
                       color:
-                          isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                      isDark ? AppColors.darkBorder : AppColors.lightBorder,
                       height: 1),
                   const SizedBox(height: 14),
                   Row(
@@ -754,7 +756,7 @@ class _FlightBookingDetail {
       cabinClass: (j['cabin_class'] as String? ?? j['cabinClass'] as String?)
           ?.toUpperCase(),
       departureTime:
-          j['departure_time'] as String? ?? j['departureTime'] as String?,
+      j['departure_time'] as String? ?? j['departureTime'] as String?,
     );
   }
 }
@@ -790,7 +792,7 @@ class _Booking {
     return _Booking(
       id: j['id'] as String? ?? '',
       bookingRef:
-          j['booking_ref'] as String? ?? j['bookingRef'] as String? ?? '',
+      j['booking_ref'] as String? ?? j['bookingRef'] as String? ?? '',
       status: j['status'] as String? ?? '',
       totalAmount: (j['total_amount'] as num? ?? j['totalAmount'] as num? ?? 0)
           .toDouble(),
